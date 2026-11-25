@@ -1,0 +1,1461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>REAMP Logger</title>
+<style>
+:root{
+  --win:#f0f0f0; --fg:#000; --muted:#555; --line:#d5d5d5; --group:#dcdcdc; --input:#fff; --inputb:#7a7a7a;
+  --btn:#e1e1e1; --btnb:#adadad; --btnh:#e5f1fb; --btnhb:#0078d7; --tab:#f0f0f0; --tabsel:#fff; --tip:#ffffe8;
+  --disabled:#9a9a9a; --meter:#fafafa; --ok:#1a8f35; --warn:#c06f00;
+}
+body.dark{
+  --win:#2d2d30; --fg:#e6e6e6; --muted:#aaa; --line:#4a4a4f; --group:#55555a; --input:#1e1e1e; --inputb:#6a6a6a;
+  --btn:#3c3c40; --btnb:#5c5c62; --btnh:#3e5468; --btnhb:#3a96dd; --tab:#2d2d30; --tabsel:#3a3a3e; --tip:#3d3a2c;
+  --disabled:#6c6c6c; --meter:#252528; --ok:#4cd06c; --warn:#f0a030;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font:12px "Segoe UI",system-ui,-apple-system,sans-serif;background:var(--win);color:var(--fg);display:flex;flex-direction:column;overflow:hidden;user-select:none}
+button{font:inherit;color:var(--fg)}
+input,select{font:inherit;color:var(--fg);background:var(--input);border:1px solid var(--inputb);border-radius:0;height:22px;padding:0 3px}
+input[type=number]{width:64px}
+input:disabled,select:disabled{color:var(--disabled)}
+input[type=radio],input[type=checkbox]{height:auto;margin:0 4px 0 0;vertical-align:-2px}
+label{white-space:nowrap}
+/* ---------- toolbar ---------- */
+#toolbar{height:30px;display:flex;align-items:center;gap:2px;padding:0 4px;border-bottom:1px solid var(--line);flex:none}
+.tb{background:none;border:1px solid transparent;padding:3px 7px;cursor:default}
+.tb:hover{background:var(--btnh);border-color:var(--btnhb)}
+.tb.on{background:var(--btnh)}
+.sep{width:1px;height:20px;background:var(--line);margin:0 6px}
+.tbgap{flex:1}
+.menu{position:relative}
+.menu .drop{display:none;position:absolute;top:24px;left:0;background:var(--win);border:1px solid var(--btnb);box-shadow:2px 2px 6px rgba(0,0,0,.25);z-index:20;min-width:190px;padding:2px 0}
+.menu.open .drop{display:block}
+.drop div{padding:4px 22px;white-space:nowrap}
+.drop div:hover{background:var(--btnh)}
+.drop div.chk::before{content:"\2713";position:absolute;left:7px}
+.szgrp{display:flex;align-items:center;border:1px solid var(--line);border-radius:3px;margin-right:6px}
+.szgrp .tb{padding:2px 6px}
+#bSzRst{min-width:46px}
+/* ---------- layout ---------- */
+#main{flex:1;display:flex;min-height:0}
+#dock{width:296px;flex:none;display:flex;flex-direction:column;border-right:1px solid var(--line)}
+#dock.hidden{display:none}
+.docktitle{display:flex;justify-content:space-between;align-items:center;padding:3px 4px 3px 4px;color:var(--fg)}
+.docktitle .fl{width:11px;height:11px;border:1px solid var(--muted);display:inline-block;opacity:.7}
+.pane{flex:1;overflow:auto;padding:4px 8px 8px 10px}
+.pane.hidden{display:none}
+fieldset{border:1px solid var(--group);border-radius:3px;margin:6px 0 8px 0;padding:6px 10px 8px 10px}
+legend{padding:0 3px}
+.row{display:flex;align-items:center;gap:8px;margin:3px 0}
+.row.sp{justify-content:space-between}
+.qbtn{background:var(--btn);border:1px solid var(--btnb);padding:2px 12px;min-width:64px;height:24px}
+.qbtn:hover:not(:disabled){background:var(--btnh);border-color:var(--btnhb)}
+.qbtn:disabled{color:var(--disabled)}
+.qbtn.primary:not(:disabled){background:#0078d7;border-color:#005fa8;color:#fff;font-weight:600}
+.warnbtn{color:#b00000;font-weight:600}
+.inner{border:1px solid var(--group);padding:6px 10px 8px 10px;border-radius:3px;margin:0}
+.chanbox{border:1px solid var(--inputb);background:var(--input);padding:3px 6px;width:150px}
+.chanbox div{margin:2px 0}
+.mult{display:grid;grid-template-columns:auto auto;gap:3px 6px;align-items:center;font-size:11px}
+.mult input{width:44px;height:20px}
+.hint{color:var(--muted);font-size:11px}
+.qm{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;border:1px solid var(--muted);color:var(--muted);font-size:9.5px;font-weight:700;cursor:help;margin-left:5px;vertical-align:1px;line-height:1}
+.qm:hover{background:var(--btnh);color:var(--fg);border-color:var(--btnhb)}
+/* output voltage setter */
+.vset{display:flex;align-items:center;gap:10px}
+.digits{display:flex;align-items:center;padding:1px 6px;border:1px solid var(--inputb);background:var(--input);border-radius:4px;outline:none}
+.digits:focus{border-color:var(--btnhb);box-shadow:0 0 0 2px rgba(0,120,215,.25)}
+.digits.locked{opacity:.45;pointer-events:none}
+.dg{display:flex;flex-direction:column;align-items:center;width:25px}
+.dg .d{font-size:29px;font-weight:600;line-height:1.02;font-variant-numeric:tabular-nums;width:100%;text-align:center;border-radius:3px;cursor:ns-resize}
+.dg.sel .d{background:rgba(0,120,215,.13)}
+.digits:focus .dg.sel .d{background:rgba(0,120,215,.30)}
+.ar{background:none;border:none;padding:0;width:100%;height:14px;font-size:9px;line-height:14px;color:var(--muted);border-radius:2px}
+.ar:hover{background:var(--btnh);color:var(--fg)}
+.dp{font-size:29px;font-weight:600;margin:0 1px}
+.vu{font-size:17px;margin-left:5px;color:var(--muted)}
+.vstate{font-size:11px;line-height:1.3;max-width:120px}
+.vstate.ok{color:var(--ok)} .vstate.pend{color:var(--warn);font-weight:600} .vstate.busy{color:var(--muted)}
+#vslider{width:100%;margin:9px 0 0 0;height:auto;accent-color:#0078d7;padding:0;border:none;background:none}
+.vscale{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);margin-bottom:4px}
+/* smoothing */
+.smgrid{display:grid;grid-template-columns:88px 1fr;gap:4px 8px;align-items:center}
+.smgrid select{width:100%}
+.swl{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.sw{width:10px;height:10px;border-radius:2px;display:inline-block;flex:none}
+/* run buttons */
+#actions{padding:6px 8px 7px 8px;border-top:1px solid var(--line)}
+.runbtns{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:6px}
+.rb{height:50px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0;background:var(--btn);border:1px solid var(--btnb);border-radius:5px;font-size:11px;font-weight:600}
+.rb svg{width:22px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8}
+.rb svg .fillc{fill:currentColor;stroke:none}
+.rb:hover:not(:disabled){border-color:var(--btnhb);background:var(--btnh)}
+.rb:disabled{opacity:.38}
+.rb.go:not(:disabled){background:#e3f5e7;border-color:#2e9e4a;color:#14662a}
+.rb.go:hover:not(:disabled){background:#cdeed5}
+body.dark .rb.go:not(:disabled){background:#1d3b25;border-color:#3fbf5f;color:#a6ebb6}
+.rb.halt:not(:disabled){background:#d62020;border-color:#a50f0f;color:#fff}
+.rb.halt:hover:not(:disabled){background:#e83c3c}
+.rb.running,.rb.running:disabled{background:#1f9d3a;border-color:#137a2a;color:#fff;opacity:1;animation:pulseG 1.4s infinite}
+.rb.armed,.rb.armed:disabled{background:#e08a00;border-color:#b06a00;color:#fff;opacity:1;animation:pulseA 1.1s infinite}
+@keyframes pulseG{0%,100%{box-shadow:0 0 0 0 rgba(31,157,58,.6)}60%{box-shadow:0 0 0 7px rgba(31,157,58,0)}}
+@keyframes pulseA{0%,100%{box-shadow:0 0 0 0 rgba(224,138,0,.65)}60%{box-shadow:0 0 0 7px rgba(224,138,0,0)}}
+@keyframes pulseR{0%,100%{box-shadow:0 0 0 0 rgba(214,32,32,.6)}60%{box-shadow:0 0 0 6px rgba(214,32,32,0)}}
+#docktabs{display:flex;padding:0 0 2px 2px;border-top:1px solid var(--line)}
+.dtab{border:1px solid var(--line);border-top:none;background:var(--tab);padding:2px 9px;margin-right:-1px}
+.dtab.sel{background:var(--tabsel);position:relative;top:-1px;padding-top:3px}
+/* status pane */
+.leds{display:grid;grid-template-columns:auto auto;gap:5px 20px;border:1px solid var(--group);padding:8px 12px;border-radius:3px;margin-top:6px;width:200px}
+.led{display:flex;align-items:center;gap:6px}
+.ball{width:11px;height:11px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#e8e8e8,#8a8a8a 60%,#5a5a5a);box-shadow:0 0 1px #000}
+.ball.on{background:radial-gradient(circle at 35% 30%,#ffb3b3,#e00000 55%,#7a0000)}
+.readouts{border:1px solid var(--group);padding:8px 12px;border-radius:3px;margin-top:8px;width:200px}
+.ro{display:flex;align-items:center;gap:8px;margin:4px 0}
+.ro .v{width:62px;border:1px solid var(--inputb);background:var(--input);padding:1px 4px;font-weight:700;text-align:left}
+/* ---------- workspace ---------- */
+#work{flex:1;display:flex;flex-direction:column;min-width:0}
+#meter{display:flex;align-items:stretch;flex:none;border-bottom:1px solid var(--line);background:var(--meter);overflow:hidden;min-height:60px}
+#meter.hidden{display:none}
+.mcell{display:flex;flex-direction:column;justify-content:center;padding:4px 13px 4px 11px;border-right:1px solid var(--line);white-space:nowrap;min-width:0}
+.mcell .ml{font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:6px}
+.mcell .mv{font-size:28px;font-weight:600;line-height:1.08;font-variant-numeric:tabular-nums}
+.mcell .mu{font-size:15px;font-weight:500;margin-left:4px;color:var(--muted)}
+.mcell.sm .mv{font-size:19px}
+.mcell .msub{font-size:10.5px;color:var(--muted)}
+.msub.on{color:var(--ok);font-weight:700} .msub.del{color:var(--warn);font-weight:700} .msub.off{font-weight:700}
+.msub.offr{color:#d62020;font-weight:700} body.dark .msub.offr{color:#ff6b6b}
+.sigs{display:flex;gap:4px;margin:4px 0 2px 0}
+.sig{display:inline-block;padding:1px 7px;border-radius:9px;font-size:11px;font-weight:700;letter-spacing:.04em;background:#d6d6d6;color:#666}
+body.dark .sig{background:#3c3c40;color:#999}
+.sig.on{background:#1f9d3a;color:#fff} .sig.bad{background:#d62020;color:#fff}
+.badge{display:inline-block;padding:3px 11px;border-radius:11px;font-weight:700;font-size:12px;letter-spacing:.06em;margin:3px 0 2px 0;align-self:flex-start}
+.badge.ready{background:#d6d6d6;color:#222}
+.badge.run{background:#d62020;color:#fff;animation:pulseR 1.4s infinite}
+.badge.armed{background:#e08a00;color:#fff;animation:pulseA 1.1s infinite}
+.badge.offline{background:#555;color:#fff}
+#markerbar{height:28px;position:relative;flex:none}
+#markerbar.off{height:4px}
+#mlabel{position:absolute;right:8px;top:7px;color:var(--fg)}
+.flag{position:absolute;top:4px;width:22px;height:22px;margin-left:-11px;cursor:ew-resize}
+.flag svg{width:22px;height:22px}
+#tabs{height:25px;display:flex;align-items:flex-end;padding-left:4px;flex:none;overflow:hidden;border-bottom:1px solid var(--line)}
+.ctab{display:flex;align-items:center;gap:6px;padding:2px 8px 2px 10px;border:1px solid var(--line);border-bottom:none;background:var(--tab);margin-right:-1px;height:22px;clip-path:polygon(6px 0,calc(100% - 6px) 0,100% 100%,0 100%)}
+.ctab.sel{background:var(--tabsel);height:24px}
+.ctab .x{width:13px;height:13px;line-height:11px;text-align:center;border:1px solid #c0c0c0;color:#777;font-size:10px}
+.ctab.sel .x{background:#e9503a;border-color:#c83c27;color:#fff}
+#chartbox{flex:1;position:relative;min-height:120px;border-bottom:1px solid var(--line)}
+#chart{position:absolute;inset:0;width:100%;height:100%;cursor:crosshair;display:block}
+#chartHelp{position:absolute;right:6px;top:6px;z-index:3}
+#tipbox{position:absolute;display:none;background:#ffffe1;color:#000;border:1px solid #000;padding:3px 6px;font-size:12px;line-height:1.35;pointer-events:none;white-space:pre}
+#navrow{height:66px;display:flex;align-items:center;gap:5px;padding:4px 6px;flex:none;border-bottom:1px solid var(--line);position:relative}
+#navrow.hidden{display:none}
+#nav{flex:1 1 0;width:0;min-width:0;height:54px;cursor:pointer;display:block}
+.sq{width:38px;height:38px;flex:none;background:var(--btn);border:1px solid var(--btnb);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:17px;padding:0}
+.sq svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8}
+.sq svg .fillc{fill:currentColor;stroke:none}
+.sq:hover:not(:disabled){background:var(--btnh);border-color:var(--btnhb)}
+.sq:disabled{opacity:.38}
+#bRunToggle{width:48px}
+#bRunToggle:not(:disabled){background:#e3f5e7;border-color:#2e9e4a;color:#14662a}
+body.dark #bRunToggle:not(.stop):not(.armed):not(:disabled){background:#1d3b25;border-color:#3fbf5f;color:#a6ebb6}
+#bRunToggle.stop:not(:disabled){background:#d62020;border-color:#a50f0f;color:#fff;animation:pulseR 1.4s infinite}
+#bRunToggle.armed:not(:disabled){background:#e08a00;border-color:#b06a00;color:#fff;animation:pulseA 1.1s infinite}
+.navsep{width:1px;height:34px;background:var(--line);margin:0 2px;flex:none}
+#axbtns{position:absolute;inset:0;pointer-events:none}
+.axbtn{position:absolute;pointer-events:auto;height:18px;min-width:30px;padding:0 4px;font-size:10px;font-weight:700;line-height:16px;background:var(--btn);border:1px solid var(--btnb);border-radius:3px;opacity:.9;cursor:pointer;white-space:nowrap}
+.axbtn:hover{background:var(--btnh);border-color:var(--btnhb);opacity:1}
+.calcinfo{max-width:440px;margin:0 0 10px 0;line-height:1.45}
+.calcinfo summary{cursor:pointer;font-weight:600;color:var(--fg)}
+.calcinfo p,.calcinfo ul{margin:6px 0}
+.calcinfo ul{padding-left:18px}
+.sidegrid{display:grid;grid-template-columns:110px auto auto;gap:4px 14px;align-items:center}
+#report{height:118px;display:flex;align-items:flex-start;gap:0;padding:6px 12px 4px 12px;flex:none;position:relative}
+#report.hidden{display:none}
+.rtab{border-collapse:collapse;margin-right:40px}
+.rtab td,.rtab th{padding:2px 12px 2px 0;text-align:left;font-weight:400;min-width:54px;white-space:nowrap}
+.rtab th:first-child{min-width:104px}
+#rt2wrap{border-left:1px solid var(--line);padding-left:10px}
+#hover{position:absolute;right:8px;bottom:4px;border:1px solid var(--line);padding:5px 12px;background:var(--win);min-width:330px}
+#statusbar{height:22px;display:flex;align-items:center;justify-content:space-between;padding:0 6px;border-top:1px solid var(--line);flex:none;color:var(--fg)}
+#sbright{color:var(--muted)}
+/* ---------- dialogs ---------- */
+dialog{padding:0;border:1px solid #707070;background:var(--win);color:var(--fg);box-shadow:4px 4px 16px rgba(0,0,0,.35)}
+dialog::backdrop{background:rgba(0,0,0,.08)}
+.dtitle{display:flex;justify-content:space-between;align-items:center;padding:5px 6px 5px 10px;color:var(--muted)}
+.dclose{background:none;border:none;width:24px;height:20px}
+.dclose:hover{background:#e81123;color:#fff}
+.dbody{padding:4px 14px 14px 14px}
+.cgrid{display:grid;grid-template-columns:215px 140px 62px;gap:5px 6px;align-items:center}
+.cgrid .box{border:1px solid var(--inputb);background:var(--group);padding:1px 4px;height:22px;line-height:19px;overflow:hidden;white-space:nowrap;font-size:11px}
+.cgrid .val{border:1px solid var(--inputb);padding:1px 3px;height:22px;line-height:19px;font-size:11px;text-align:center;background:var(--win)}
+.blife{margin-top:16px;font-weight:700}
+.blbox{border:1px solid var(--inputb);background:var(--win);padding:3px 8px;margin-top:4px;min-height:24px}
+#loglist{width:520px;max-height:360px;overflow:auto;border:1px solid var(--inputb);background:var(--input)}
+#loglist div{display:grid;grid-template-columns:1fr 90px 120px;padding:3px 8px;cursor:default}
+#loglist div:hover{background:var(--btnh)}
+#loglist div.hdr{font-weight:600;background:var(--win);position:sticky;top:0}
+.stabs{display:flex;margin-bottom:8px}
+.stab{border:1px solid var(--line);padding:3px 10px;margin-right:-1px;background:var(--tab)}
+.stab.sel{background:var(--tabsel);border-bottom-color:var(--tabsel)}
+.sp-pane{border:1px solid var(--line);padding:10px 12px;min-width:430px;min-height:190px}
+.colors{display:flex;gap:16px;align-items:center;margin:6px 0}
+.colors input[type=color]{width:34px;height:22px;padding:0;border:1px solid var(--inputb)}
+#evpop{position:absolute;right:52px;bottom:70px;background:var(--win);border:1px solid var(--btnb);padding:8px 10px;display:none;z-index:15;box-shadow:2px 2px 6px rgba(0,0,0,.25)}
+.helpbody{max-width:560px;line-height:1.5}
+.keys{border-collapse:collapse;margin:8px 0}
+.keys td{padding:4px 12px 4px 0;vertical-align:top}
+.keys td:first-child{white-space:nowrap}
+kbd{display:inline-block;border:1px solid var(--btnb);border-bottom-width:2px;border-radius:3px;padding:0 5px;font:11px "Segoe UI",sans-serif;background:var(--btn)}
+/* hover help */
+#helptip{position:fixed;z-index:1000;display:none;max-width:380px;background:var(--tip);color:var(--fg);border:1px solid var(--btnb);border-radius:4px;padding:7px 10px 8px 10px;box-shadow:0 3px 12px rgba(0,0,0,.28);font-size:12px;line-height:1.45;pointer-events:none;white-space:normal;user-select:none}
+#helptip b{display:block;margin-bottom:3px;font-size:12.5px}
+@media (prefers-reduced-motion: reduce){ .rb.running,.rb.armed,.badge.run,.badge.armed,#bRunToggle.stop,#bRunToggle.armed{animation:none} }
+</style>
+</head>
+<body>
+<div id="toolbar">
+  <div class="menu" id="mSave"><button class="tb" data-h="save">Save</button>
+    <div class="drop"><div data-a="csv">Save data as CSV...</div><div data-a="png">Save chart as PNG...</div></div></div>
+  <button class="tb" id="bOpen" data-h="open">Open</button>
+  <div class="menu" id="mView"><button class="tb" data-h="view">View &#9662;</button>
+    <div class="drop" id="viewdrop">
+      <div data-v="dock">Control panel</div><div data-v="meter">Big readouts</div><div data-v="nav">Navigation bar</div>
+      <div data-v="report">Report</div><div data-v="dark">Dark theme</div></div></div>
+  <button class="tb" id="bSettings" data-h="settings">Settings</button>
+  <div class="sep"></div>
+  <span data-h="show">Show</span>
+  <select id="selShow" style="width:84px;margin-left:5px" data-h="show">
+    <option>1</option><option>2</option><option>5</option><option selected>10</option><option>30</option>
+    <option>60</option><option>120</option><option>300</option><option>600</option></select><span style="margin-left:3px">sec</span>
+  <div class="sep"></div>
+  <button class="tb" id="bReport" data-h="report">Hide Report</button>
+  <button class="tb" id="bMarkers" data-h="markers">Show Markers</button>
+  <button class="tb" id="bCalc" data-h="calc">Battery Calculator</button>
+  <div class="sep"></div>
+  <div class="tbgap"></div>
+  <div class="szgrp" data-h="size"><button class="tb" id="bSzDn">A&minus;</button><button class="tb" id="bSzRst">100%</button><button class="tb" id="bSzUp">A+</button></div>
+  <button class="tb" id="bHelp" data-h="help">Help</button>
+  <div class="sep"></div>
+  <span data-h="meas">Measuring time,sec</span>
+  <select id="selMeas" style="width:96px;margin:0 6px 0 5px" data-h="meas">
+    <option value="0">&infin;</option><option>1</option><option>5</option><option>10</option><option>30</option>
+    <option>60</option><option>100</option><option>300</option><option>600</option><option>1800</option><option>3600</option></select>
+</div>
+
+<div id="main">
+  <div id="dock">
+    <div class="docktitle"><span id="docktitle">Control</span><span class="fl"></span></div>
+    <!-- CONTROL PANE -->
+    <div class="pane" id="paneControl">
+      <fieldset id="fsPower"><legend>Power output config<span class="qm" data-h="pmode">?</span></legend>
+        <div class="row"><label data-h="pm8"><input type="radio" name="pmode" value="8" checked>Permanent</label>
+          <label style="margin-left:14px" data-h="pm12"><input type="radio" name="pmode" value="12">Delayed</label></div>
+        <div class="row sp"><label data-h="pm4"><input type="radio" name="pmode" value="4">Off</label>
+          <button class="qbtn" id="bSet" data-h="set">Set</button></div>
+        <div class="row" id="errRow" style="display:none"><button class="qbtn warnbtn" id="bReset" data-h="reset">&#9888; Reset errors</button></div>
+      </fieldset>
+
+      <fieldset id="fsVolt"><legend>Output voltage<span class="qm" data-h="volt">?</span></legend>
+        <div class="vset">
+          <div class="digits" id="vdigits" tabindex="0" data-h="digits">
+            <div class="dg" data-i="0"><button class="ar up" tabindex="-1">&#9650;</button><span class="d">3</span><button class="ar dn" tabindex="-1">&#9660;</button></div>
+            <span class="dp">.</span>
+            <div class="dg" data-i="1"><button class="ar up" tabindex="-1">&#9650;</button><span class="d">1</span><button class="ar dn" tabindex="-1">&#9660;</button></div>
+            <div class="dg" data-i="2"><button class="ar up" tabindex="-1">&#9650;</button><span class="d">2</span><button class="ar dn" tabindex="-1">&#9660;</button></div>
+            <div class="dg" data-i="3"><button class="ar up" tabindex="-1">&#9650;</button><span class="d">1</span><button class="ar dn" tabindex="-1">&#9660;</button></div>
+            <span class="vu">V</span>
+          </div>
+          <div class="vstate busy" id="vstate" data-h="vstate"></div>
+        </div>
+        <input type="range" id="vslider" min="1800" max="3300" step="25" value="3121" data-h="slider">
+        <div class="vscale"><span>1.800 V</span><span id="vmaxl">3.300 V</span></div>
+        <div class="hint" id="vq" data-h="vq" style="margin:-2px 0 4px 0"></div>
+        <div class="row sp"><label data-h="instant"><input type="checkbox" id="chkInstant">Apply instantly</label>
+          <button class="qbtn" id="bSetV" data-h="setv">Set voltage</button></div>
+        <div class="row" data-h="vmax"><span>Limit</span><input type="number" id="inVmax" min="1800" max="5200" step="10" value="3300" style="width:66px"><span>mV</span></div>
+      </fieldset>
+
+      <fieldset class="inner" id="fsVin" style="margin-bottom:8px"><legend>Switch Vin<span class="qm" data-h="vin">?</span></legend>
+        <div class="row"><label data-h="vin"><input type="radio" name="vin" value="bat">Vbat -&gt; Vin</label>
+          <label style="margin-left:6px" data-h="vin"><input type="radio" name="vin" value="usb" checked>Vusb -&gt; Vin</label></div>
+      </fieldset>
+      <fieldset class="inner" id="fsSync" style="margin-bottom:6px"><legend>Apply sync related to<span class="qm" data-h="sync">?</span></legend>
+        <div class="row"><label data-h="sync"><input type="radio" name="sync" value="trig">TRIG</label>
+          <label style="margin-left:6px" data-h="sync"><input type="radio" name="sync" value="log" checked>Logging</label></div>
+      </fieldset>
+      <div class="row sp" style="margin-bottom:10px"><span data-h="syncdelay"><input type="number" id="inSync" min="0" max="65535" value="0" style="width:58px"> Sync delay(ms)</span>
+        <button class="qbtn" id="bApply" data-h="apply">Apply</button></div>
+
+      <fieldset id="fsRate"><legend>Sample rate<span class="qm" data-h="rate">?</span></legend>
+        <select id="selRate" style="width:100%" data-h="rate">
+          <option value="1000">10 Hz</option><option value="500">20 Hz</option><option value="200">50 Hz</option>
+          <option value="100">100 Hz</option><option value="50">200 Hz</option><option value="20">500 Hz</option>
+          <option value="10" selected>1 kHz</option><option value="5">2 kHz</option><option value="2">5 kHz</option>
+          <option value="1">10 kHz</option></select>
+        <div class="row" style="margin-top:6px"><label data-h="custom"><input type="checkbox" id="chkCustom">Custom (100us units)</label></div>
+        <div class="row" data-h="period"><input type="number" id="inPeriod" min="1" max="1000" value="10" disabled style="width:58px">
+          <span id="periodKhz">(1.000 kHz)</span></div>
+        <div class="hint" id="trueRate"></div>
+      </fieldset>
+
+      <fieldset id="fsCh"><legend>Channels<span class="qm" data-h="chans">?</span></legend>
+        <div class="row" style="align-items:flex-start;gap:14px">
+          <div class="chanbox">
+            <div><label data-h="ch0"><input type="checkbox" class="chk" value="0" checked>#0: Current</label></div>
+            <div><label data-h="ch1"><input type="checkbox" class="chk" value="1">#1: Voltage</label></div>
+            <div><label data-h="ch2"><input type="checkbox" class="chk" value="2">#2: Voltage</label></div>
+          </div>
+          <div class="mult" data-h="mult"><span></span><span>Multiplier</span>
+            <span>#1</span><input type="number" id="mul1" value="1" step="0.1" min="0.001">
+            <span>#2</span><input type="number" id="mul2" value="1" step="0.1" min="0.001"></div>
+        </div>
+      </fieldset>
+
+      <fieldset id="fsSmooth"><legend>Trace smoothing<span class="qm" data-h="smooth">?</span></legend>
+        <div class="smgrid" data-h="smooth">
+          <span class="swl"><i class="sw" data-c="0"></i>#0 Current</span><select class="smsel" id="sm0" data-c="0"></select>
+          <span class="swl"><i class="sw" data-c="1"></i>#1 Vin1</span><select class="smsel" id="sm1" data-c="1"></select>
+          <span class="swl"><i class="sw" data-c="2"></i>#2 Vin2</span><select class="smsel" id="sm2" data-c="2"></select>
+        </div>
+        <div class="hint" style="margin-top:4px">Display only &ndash; statistics and saved files stay raw.</div>
+      </fieldset>
+    </div>
+    <div id="actions">
+      <div class="row" data-h="delay"><span>TRIG delay</span><input type="number" id="inDelay" min="0" max="65535" value="0" style="width:66px"><span>ms</span></div>
+      <div class="runbtns">
+        <button class="rb" id="bLevel" data-h="level"><svg viewBox="0 0 20 16"><path d="M2 13h6V4h4"/><path d="M14 4l3 0M15 2l2 2-2 2"/></svg><span>TRIG level</span></button>
+        <button class="rb" id="bTrig" data-h="trig"><svg viewBox="0 0 20 16"><path d="M2 13h5V3h6v10h5"/></svg><span>TRIG</span></button>
+        <button class="rb go" id="bStart" data-h="start"><svg viewBox="0 0 20 16"><path class="fillc" d="M6 1.5l10 6.5-10 6.5z"/></svg><span>Start</span></button>
+        <button class="rb halt" id="bStop" data-h="stop"><svg viewBox="0 0 20 16"><rect class="fillc" x="4.5" y="2.5" width="11" height="11" rx="1"/></svg><span>Stop</span></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="work">
+    <div id="meter">
+      <div class="mcell" data-h="mRun"><span class="ml">Status</span><span class="badge ready" id="runBadge">READY</span><span class="msub" id="runSub"></span></div>
+      <div class="mcell" data-h="m0"><span class="ml"><i class="sw" data-c="0"></i>#0 Current</span><span class="mv"><span id="mv0">--</span><span class="mu" id="mu0">&micro;A</span></span><span class="msub" id="ms0"></span></div>
+      <div class="mcell" data-h="m1"><span class="ml"><i class="sw" data-c="1"></i>#1 Vin1</span><span class="mv"><span id="mv1">--</span><span class="mu" id="mu1">V</span></span><span class="msub" id="ms1"></span></div>
+      <div class="mcell sm" data-h="m2"><span class="ml"><i class="sw" data-c="2"></i>#2 Vin2</span><span class="mv"><span id="mv2">--</span><span class="mu" id="mu2">V</span></span><span class="msub" id="ms2"></span></div>
+      <div class="mcell" data-h="mOut"><span class="ml">Output setpoint</span><span class="mv"><span id="mvOut">--</span><span class="mu">V</span></span><span class="msub" id="msOut"></span></div>
+      <div class="mcell sm" data-h="mSup"><span class="ml">REAMP supply</span><span class="mv"><span id="mvSup">--</span><span class="mu">V</span></span><span class="msub" id="msSup"></span></div>
+      <div class="mcell" data-h="mSig"><span class="ml">Signals</span><span class="sigs"><span class="sig" id="sgTrig" data-h="sigTrig">TRIG</span><span class="sig" id="sgSync" data-h="sigSync">SYNC</span><span class="sig" id="sgErr" data-h="sigErr">OK</span></span><span class="msub" id="msSig"></span></div>
+    </div>
+    <div id="markerbar">
+      <div class="flag" id="flag1" style="display:none" data-h="flags"><svg viewBox="0 0 22 22"><path d="M3 1h16v13l-8 6-8-6z" fill="#e9f5ec" stroke="#2e8b57"/><text x="11" y="11" font-size="9" text-anchor="middle" fill="#1d5e38">T1</text></svg></div>
+      <div class="flag" id="flag2" style="display:none" data-h="flags"><svg viewBox="0 0 22 22"><path d="M3 1h16v13l-8 6-8-6z" fill="#e9f5ec" stroke="#2e8b57"/><text x="11" y="11" font-size="9" text-anchor="middle" fill="#1d5e38">T2</text></svg></div>
+      <span id="mlabel"></span>
+    </div>
+    <div id="tabs" data-h="tabs"></div>
+    <div id="chartbox"><canvas id="chart"></canvas><div id="axbtns"></div><div id="tipbox"></div><span class="qm" id="chartHelp" data-h="chart">?</span></div>
+    <div id="navrow"><canvas id="nav"></canvas>
+      <span class="qm" data-h="navbar">?</span>
+      <div class="navsep"></div>
+      <button class="sq" id="bRunToggle" data-h="toggle"></button>
+      <button class="sq" id="bRestart" data-h="restart"><svg viewBox="0 0 20 20"><path d="M3.6 8.6a6.6 6.6 0 0 1 11.6-3.2l1.3 1.4"/><path d="M16.8 2.6v4.4h-4.4"/><path d="M16.4 11.4a6.6 6.6 0 0 1-11.6 3.2l-1.3-1.4"/><path d="M3.2 17.4V13h4.4"/></svg></button>
+      <button class="sq" id="bResetZoom" data-h="fit"><svg viewBox="0 0 20 20"><path d="M3 7.5V3h4.5M12.5 3H17v4.5M17 12.5V17h-4.5M7.5 17H3v-4.5"/></svg></button>
+      <button class="sq" id="bEvSet" data-h="events">&#9881;</button>
+      <div id="evpop"><div style="margin-bottom:6px">Highlight #0 peaks above</div>
+        <input type="number" id="inThr" step="any" style="width:90px" data-h="events"> <span id="thrUnit">&micro;A</span>
+        <div class="hint" style="margin-top:4px">Empty = auto (80% of the highest peak)</div></div>
+    </div>
+    <div id="report" data-h="reportTables">
+      <table class="rtab" id="rt1"></table>
+      <div id="rt2wrap"><table class="rtab" id="rt2"></table></div>
+      <div id="hover" data-h="hover"><span class="hint">Move the mouse over the chart</span></div>
+    </div>
+  </div>
+</div>
+<div id="statusbar"><span id="sbmsg">Connecting...</span><span id="sbright"></span></div>
+<div id="helptip"></div>
+
+<!-- Calculator -->
+<dialog id="dlgCalc">
+  <div class="dtitle"><span>Battery Calculator</span><button class="dclose" data-close>&#10005;</button></div>
+  <div class="dbody">
+    <details class="calcinfo" id="calcInfo" open><summary>What is this for?</summary>
+      <p>It estimates how long a battery would run the device you measured:
+        <b>battery life = battery capacity &divide; average current</b>.
+        Example: 55 mAh &divide; 0.00218 mA &asymp; 25,200 hours &asymp; 2 years 10 months.</p>
+      <ul>
+        <li><b>Predict battery life</b> of a design or a product, such as the watch on its two 395 cells.</li>
+        <li><b>Compare</b> firmware versions, settings or operating modes by the battery life each would give.</li>
+        <li><b>Find what costs the most:</b> put the markers around one part of the cycle and compare it with the whole period.</li>
+        <li><b>Size a battery:</b> enter a current under User defined and try different capacities.</li>
+      </ul>
+      <p><b>For a trustworthy average,</b> measure long enough to include every repeating event, and average over whole cycles.
+        The watch ticks every second and does something extra once a minute, so use whole minutes
+        (By working cycle = 60, or markers exactly N minutes apart).</p>
+      <p class="hint">Real batteries usually last less than this estimate: the rated capacity is measured at a set load and cut-off
+        voltage, it drops in the cold, self-discharge slowly drains a cell over a multi-year life, and the device may stop working
+        before the battery is empty. Below 10 &micro;A the REAMP is outside its rated range, so confirm such averages with a meter.</p>
+    </details>
+    <div class="row" style="margin-bottom:10px" data-h="capacity"><span style="width:120px">Battery capacity</span>
+      <input type="number" id="inCap" value="55" min="0.1" step="any" style="width:110px"> <span>mAh</span></div>
+    <fieldset><legend>Averaging current<span class="qm" data-h="avg">?</span></legend>
+      <div class="cgrid">
+        <label data-h="avgMk"><input type="radio" name="avg" value="mk">By markers</label><div class="box" id="cbMk">-- : --</div><div class="val" id="cvMk">--- mA</div>
+        <label data-h="avgVis"><input type="radio" name="avg" value="vis">In visible area</label><div class="box" id="cbVis"></div><div class="val" id="cvVis"></div>
+        <label data-h="avgAll"><input type="radio" name="avg" value="all" checked>The whole measurement period</label><div class="box" id="cbAll"></div><div class="val" id="cvAll"></div>
+        <label data-h="avgCyc"><input type="radio" name="avg" value="cyc">By working cycle, sec</label><input type="number" id="inCyc" value="1" min="0.001" step="any" style="width:130px" data-h="avgCyc"><div class="val" id="cvCyc"></div>
+        <label data-h="avgUsr"><input type="radio" name="avg" value="usr">User defined, mA</label><input type="number" id="inUsr" value="1" min="0" step="any" style="width:130px" data-h="avgUsr"><span></span>
+      </div>
+    </fieldset>
+    <div class="blife" data-h="life">Battery life</div>
+    <div class="blbox" id="blife" data-h="life">--</div>
+    <div class="hint" id="blcalc" style="margin-top:3px"></div>
+    <div class="hint" style="margin-top:6px;max-width:400px" id="calcNote"></div>
+  </div>
+</dialog>
+
+<!-- Open -->
+<dialog id="dlgOpen">
+  <div class="dtitle"><span>Open log</span><button class="dclose" data-close>&#10005;</button></div>
+  <div class="dbody"><div class="hint" style="margin-bottom:6px">Logs saved in REAMP-Control\logs (double-click to open)</div>
+    <div id="loglist"></div></div>
+</dialog>
+
+<!-- Settings -->
+<dialog id="dlgSettings">
+  <div class="dtitle"><span>Settings</span><button class="dclose" data-close>&#10005;</button></div>
+  <div class="dbody">
+    <div class="stabs"><button class="stab sel" data-s="app">Appearance</button><button class="stab" data-s="about">About</button></div>
+    <div class="sp-pane" id="spApp">
+      <fieldset class="inner"><legend>Color theme</legend>
+        <label data-h="theme"><input type="radio" name="theme" value="dark">Dark</label>
+        <label style="margin-left:14px" data-h="theme"><input type="radio" name="theme" value="light" checked>Light</label></fieldset>
+      <fieldset class="inner" style="margin-top:10px"><legend>Colors</legend>
+        <div class="colors" data-h="colors"><label><input type="color" id="col0"> #0</label><label><input type="color" id="col1"> #1</label>
+          <label><input type="color" id="col2"> #2</label><label><input type="color" id="colBg"> Charts background</label></div>
+        <button class="qbtn" id="bDefColors" style="margin-top:6px" data-h="colors">Defaults</button></fieldset>
+      <fieldset class="inner" style="margin-top:10px"><legend>Interface size</legend>
+        <div class="row" data-h="size"><select id="selScale" style="width:90px"></select>
+          <span class="hint">Text and controls; Chrome's Ctrl + / Ctrl &minus; also works</span></div></fieldset>
+      <fieldset class="inner" style="margin-top:10px"><legend>Y axis side</legend>
+        <div class="sidegrid" data-h="axis">
+          <span>#0 Current</span><label><input type="radio" name="side0" value="L">Left</label><label><input type="radio" name="side0" value="R">Right</label>
+          <span>#1 Vin1</span><label><input type="radio" name="side1" value="L">Left</label><label><input type="radio" name="side1" value="R">Right</label>
+          <span>#2 Vin2</span><label><input type="radio" name="side2" value="L">Left</label><label><input type="radio" name="side2" value="R">Right</label>
+        </div></fieldset>
+    </div>
+    <div class="sp-pane" id="spAbout" style="display:none;line-height:1.7"></div>
+  </div>
+</dialog>
+
+<!-- Help -->
+<dialog id="dlgHelp">
+  <div class="dtitle"><span>Help</span><button class="dclose" data-close>&#10005;</button></div>
+  <div class="dbody helpbody">
+    <p style="margin-top:4px"><b>Hover over any control</b>, or over a <span class="qm">?</span>, for a description of what it does.</p>
+    <table class="keys">
+      <tr><td><kbd>Space</kbd></td><td>Start / Stop measuring</td></tr>
+      <tr><td><kbd>R</kbd></td><td>Restart: stop the running capture and start a new one at once</td></tr>
+      <tr><td><kbd>F</kbd></td><td>Fit: show the whole capture</td></tr>
+      <tr><td>Voltage digits</td><td>Click a digit, then <kbd>&uarr;</kbd> <kbd>&darr;</kbd> change it, <kbd>&larr;</kbd> <kbd>&rarr;</kbd> move,
+        <kbd>0</kbd>&ndash;<kbd>9</kbd> type, <kbd>Enter</kbd> apply, <kbd>Esc</kbd> undo. The mouse wheel over a digit changes it.</td></tr>
+      <tr><td>Chart</td><td>Drag to zoom into a span, mouse wheel to zoom, double-click to fit. Drag the T1/T2 flags to measure.</td></tr>
+      <tr><td>Y axes</td><td>Drag up / down on an axis to zoom that trace in / out (mouse wheel too; <kbd>Shift</kbd>+drag moves it; double-click = automatic).
+        Drag sideways, or click the arrow under it, to move it left or right.</td></tr>
+      <tr><td><kbd>Ctrl</kbd> <kbd>+</kbd> / <kbd>&minus;</kbd></td><td>Chrome zoom; the A&minus; / A+ buttons do the same inside the app</td></tr>
+    </table>
+    <p class="hint">Every capture is saved automatically to REAMP-Control\logs as CSV (time in seconds, current in &micro;A, voltages in mV).
+      Shortcut keys work when the cursor is not in a text box.</p>
+  </div>
+</dialog>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const DEF = {theme:'light', colors:{0:'#ff0000',1:'#0000ff',2:'#00c000'}, bg:'#ffffff', show:10, meas:0,
+  report:true, markers:false, dock:true, nav:true, meter:true, period:10, custom:false, chans:[0], mult:{1:1,2:1}, cap:55, thr:null,
+  scale:100, instant:false, vmax:3300, smooth:{0:0,1:0,2:0}, side:{0:'L',1:'R',2:'R'}};
+let S = JSON.parse(JSON.stringify(DEF));
+try {
+  const L = JSON.parse(localStorage.getItem('reampUI') || '{}');
+  Object.assign(S, L);
+  S.colors = Object.assign({...DEF.colors}, L.colors || {}); S.mult = Object.assign({1:1, 2:1}, L.mult || {});
+  S.smooth = Object.assign({0:0, 1:0, 2:0}, L.smooth || {});
+  S.side = Object.assign({0:'L', 1:'R', 2:'R'}, L.side || {});
+} catch (e) {}
+function saveS(){ try { localStorage.setItem('reampUI', JSON.stringify(S)); } catch (e) {} }
+const DARKCOL = {0:'#ff5050', 1:'#6f9bff', 2:'#3fd43f'};
+const isDefCol = () => [0,1,2].every(c => (S.colors[c] || '').toLowerCase() === DEF.colors[c]);
+const COL = c => (S.theme === 'dark' && isDefCol()) ? DARKCOL[c] : S.colors[c];
+function setTheme(t){ S.theme = t; if (t === 'dark' && S.bg === '#ffffff') S.bg = '#1e1e1e'; if (t === 'light' && S.bg === '#1e1e1e') S.bg = '#ffffff'; }
+
+const st = {dev:null, status:null, caps:[], capId:null, follow:true, view:{t0:0,t1:10}, env:null, ov:null,
+  ovAt:0, envKey:'', full:null, win:null, vis:null, cyc:null, recent:null, m:{t1:null,t2:null}, hoverT:null,
+  drag:null, sel:null, inited:false, lastRun:null, needEnv:true, sq:[], lastStatT:null, lastTrig:null, busy:false,
+  smDt:null, runKey:''};
+
+/* ---------------- helpers ---------------- */
+const curCap = () => st.caps.find(c => c.id === st.capId) || null;
+const logging = () => !!(st.dev && st.dev.logging);
+const devOk = () => !!(st.dev && st.dev.connected && st.dev.responding);
+const logCap = () => logging() ? (st.caps.find(c => c.id === st.dev.logging) || null) : null;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function api(body){ return fetch('/api/cmd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json()); }
+function msg(t, keep = 5000){ st.localMsgUntil = performance.now() + keep; $('#sbmsg').textContent = t; }  // action messages stay a few seconds
+function fmtNum(v, d){ if (v == null || !isFinite(v)) return '--'; return v.toFixed(d); }
+function autoDec(v){ const a = Math.abs(v); return a >= 1000 ? 0 : a >= 100 ? 1 : a >= 10 ? 2 : 3; }
+function curUnit(maxUA){ const a = Math.abs(maxUA||0); return a < 1000 ? ['µA',1] : a < 1e6 ? ['mA',1e-3] : ['A',1e-6]; }
+function chUnit(c, maxv){ return c === 0 ? curUnit(maxv) : ['V', 1e-3 * (S.mult[c] || 1)]; }
+function fmtDur(s){ if (s < 1e-3) return (s*1e6).toFixed(0)+' µs'; if (s < 1) return (s*1e3).toFixed(1)+' ms'; return s.toFixed(2)+' s'; }
+function fmtClock(s){ s = Math.max(0, s || 0); const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, x = s % 60;
+  return (h ? h + ':' + String(m).padStart(2,'0') : String(m)) + ':' + x.toFixed(1).padStart(4,'0'); }
+function niceStep(raw){ const p = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; }
+function channelsSel(){ return $$('.chk').filter(c => c.checked).map(c => +c.value); }
+function period(){ return $('#chkCustom').checked ? Math.max(1, Math.min(1000, +$('#inPeriod').value || 1)) : +$('#selRate').value; }
+const smW = L => L > 0 ? (1 << L) + 1 : 1;
+// CSS zoom (interface size) aware geometry: canvases draw in their own CSS pixels
+const zf = () => (S.scale || 100) / 100;
+function localX(e, el){ const r = el.getBoundingClientRect(); return (e.clientX - r.left) * (el.clientWidth / (r.width || 1)); }
+function localY(e, el){ const r = el.getBoundingClientRect(); return (e.clientY - r.top) * (el.clientHeight / (r.height || 1)); }
+
+/* ---------------- toolbar & menus ---------------- */
+function closeMenus(){ $$('.menu').forEach(m => m.classList.remove('open')); }
+$$('.menu > .tb').forEach(b => b.addEventListener('click', e => { const m = b.parentElement, o = m.classList.contains('open'); closeMenus(); if (!o) m.classList.add('open'); e.stopPropagation(); }));
+document.addEventListener('click', () => { closeMenus(); });
+$('#mSave .drop').addEventListener('click', e => {
+  const a = e.target.dataset.a, cap = curCap(); closeMenus();
+  if (!cap) return msg('No capture to save');
+  if (a === 'csv') { if (!cap.file) return msg('This capture was not saved to a file'); location.href = '/api/export?cap=' + cap.id; msg('Data is saved in logs\\' + cap.file); }
+  if (a === 'png') { const l = document.createElement('a'); l.download = (cap.file ? cap.file.replace('.csv','') : cap.name.replace(/\s+/g,'_')) + '.png'; l.href = $('#chart').toDataURL('image/png'); l.click(); }
+});
+function refreshViewMenu(){ $$('#viewdrop div').forEach(d => { const v = d.dataset.v; d.classList.toggle('chk', v === 'dark' ? S.theme === 'dark' : !!S[v]); }); }
+$('#viewdrop').addEventListener('click', e => { const v = e.target.dataset.v; if (!v) return; if (v === 'dark') setTheme(S.theme === 'dark' ? 'light' : 'dark'); else S[v] = !S[v]; applyLayout(); saveS(); });
+$('#selShow').value = S.show; $('#selShow').onchange = e => { S.show = +e.target.value; saveS(); if (logging()) st.follow = true; st.needEnv = true; };
+$('#selMeas').value = S.meas; $('#selMeas').onchange = e => { S.meas = +e.target.value; saveS(); };
+$('#bReport').onclick = () => { S.report = !S.report; applyLayout(); saveS(); };
+$('#bMarkers').onclick = () => { S.markers = !S.markers; if (S.markers) placeMarkers(); applyLayout(); saveS(); st.needEnv = true; };
+$('#bCalc').onclick = () => { $('#calcInfo').open = S.calcInfo !== false; $('#dlgCalc').showModal(); updateCalc(); };
+$('#calcInfo').addEventListener('toggle', () => { S.calcInfo = $('#calcInfo').open; saveS(); });
+$('#bSettings').onclick = () => { $('#dlgSettings').showModal(); fillSettings(); };
+$('#bHelp').onclick = () => $('#dlgHelp').showModal();
+$('#bOpen').onclick = openDialog;
+$$('[data-close]').forEach(b => b.onclick = () => b.closest('dialog').close());
+// interface size
+const SCALES = [80, 90, 100, 110, 125, 150, 175, 200];
+$('#selScale').innerHTML = SCALES.map(v => `<option value="${v}">${v}%</option>`).join('');
+function applyScale(){ document.body.style.zoom = zf(); $('#bSzRst').textContent = S.scale + '%'; $('#selScale').value = S.scale; st.needEnv = true; draw(); }
+function setScale(v){ S.scale = SCALES.includes(v) ? v : 100; saveS(); applyScale(); }
+$('#bSzDn').onclick = () => { const i = SCALES.indexOf(S.scale); setScale(SCALES[Math.max(0, (i < 0 ? 2 : i) - 1)]); };
+$('#bSzUp').onclick = () => { const i = SCALES.indexOf(S.scale); setScale(SCALES[Math.min(SCALES.length - 1, (i < 0 ? 2 : i) + 1)]); };
+$('#bSzRst').onclick = () => setScale(100);
+$('#selScale').onchange = e => setScale(+e.target.value);
+
+function applyLayout(){
+  document.body.classList.toggle('dark', S.theme === 'dark');
+  $('#dock').classList.toggle('hidden', !S.dock);
+  $('#meter').classList.toggle('hidden', !S.meter);
+  $('#navrow').classList.toggle('hidden', !S.nav);
+  $('#report').classList.toggle('hidden', !S.report);
+  $('#bReport').textContent = S.report ? 'Hide Report' : 'Show Report';
+  $('#bMarkers').textContent = S.markers ? 'Hide Markers' : 'Show Markers';
+  $('#flag1').style.display = $('#flag2').style.display = S.markers ? '' : 'none';
+  $('#markerbar').classList.toggle('off', !S.markers);
+  if (!S.markers) $('#mlabel').textContent = '';
+  $$('.sw').forEach(s => s.style.background = COL(+s.dataset.c));
+  refreshViewMenu(); applyScale();
+}
+
+/* ---------------- dock: tabs, measurement settings ---------------- */
+$$('.dtab').forEach(b => b.onclick = () => {
+  $$('.dtab').forEach(x => x.classList.toggle('sel', x === b));
+  const p = b.dataset.p; $('#docktitle').textContent = p;
+  $('#paneControl').classList.toggle('hidden', p !== 'Control'); $('#paneStatus').classList.toggle('hidden', p !== 'Status');
+});
+function initControls(){
+  $('#selRate').value = S.custom ? '10' : String(S.period); $('#chkCustom').checked = S.custom;
+  $('#inPeriod').value = S.period; $('#inPeriod').disabled = !S.custom; $('#selRate').disabled = S.custom;
+  $$('.chk').forEach(c => c.checked = S.chans.includes(+c.value));
+  $('#mul1').value = S.mult[1]; $('#mul2').value = S.mult[2]; $('#inCap').value = S.cap;
+  $('#inThr').value = S.thr == null ? '' : S.thr;
+  $('#chkInstant').checked = !!S.instant; $('#inVmax').value = S.vmax;
+  rateText(); fillSmooth(true); renderV();
+}
+function rateText(){
+  const p = period(); $('#periodKhz').textContent = '(' + (10 / p).toFixed(3) + ' kHz)';
+  const tb = st.dev && st.dev.calibrated ? 'calibrated' : '';
+  const nch = channelsSel().length;
+  let h = (p === 1 && nch > 1) ? '10 kHz works with one channel only' : '';
+  if (p === 1 && nch <= 1 && tb) h = 'This REAMP really delivers about 9.0 kHz here; timestamps are corrected.';
+  $('#trueRate').textContent = h;
+}
+$('#selRate').onchange = () => { S.period = +$('#selRate').value; $('#inPeriod').value = S.period; rateText(); fillSmooth(); saveS(); };
+$('#chkCustom').onchange = e => { S.custom = e.target.checked; $('#inPeriod').disabled = !S.custom; $('#selRate').disabled = S.custom; S.period = period(); rateText(); fillSmooth(); saveS(); };
+$('#inPeriod').oninput = () => { S.period = period(); rateText(); fillSmooth(); saveS(); };
+$$('.chk').forEach(c => c.onchange = () => { S.chans = channelsSel(); rateText(); saveS(); });
+$('#mul1').onchange = e => { S.mult[1] = +e.target.value || 1; saveS(); draw(); meterUpdate(); };
+$('#mul2').onchange = e => { S.mult[2] = +e.target.value || 1; saveS(); draw(); meterUpdate(); };
+// smoothing (display only): level L = moving average over 2^L + 1 samples
+function fillSmooth(force){
+  const cap = curCap(), dt = cap ? cap.dt : period() * 1e-4;
+  if (!force && dt === st.smDt) return; st.smDt = dt;
+  [0, 1, 2].forEach(c => {
+    const sel = $('#sm' + c); let h = '<option value="0">Off</option>';
+    for (let L = 1; L <= 10; L++) h += `<option value="${L}">${L} · ${smW(L)} samples (${fmtDur(smW(L) * dt)})</option>`;
+    sel.innerHTML = h; sel.value = String(S.smooth[c] || 0);
+  });
+}
+$$('.smsel').forEach(sel => sel.onchange = () => { S.smooth[+sel.dataset.c] = +sel.value; saveS(); st.needEnv = true; });
+
+/* ---------------- power control ---------------- */
+function radio(name){ const r = $$('input[name=' + name + ']').find(x => x.checked); return r ? r.value : null; }
+function setRadio(name, v){ $$('input[name=' + name + ']').forEach(x => x.checked = (x.value === String(v))); }
+const outName = o => ({4:'OFF', 8:'ON (permanent)', 12:'ON (delayed)'})[o] || '?';
+async function doPower(ctrl, label, mv){
+  const delay = Math.round(+$('#inSync').value || 0);
+  if (ctrl & 0x10) { mv = Math.round(mv); if (!(mv >= 1800 && mv <= 5200)) { msg('Output voltage must be 1800..5200 mV'); return false; } }
+  msg(label + '...');
+  const r = await api({action:'power', ctrl, mv: mv || 0, delay});
+  if (!r.ok) { msg(label + ' failed: ' + r.error); return false; }
+  st.status = r.status; if (ctrl & 0x10) { V.dirty = false; V.lastUser = 0; }
+  syncControls(true);
+  msg(label + ' done: Vout ' + r.status.vout_mV + ' mV, output ' + outName(r.status.out) + (r.pending ? ' (sent during the measurement)' : ''));
+  meterUpdate(); return true;
+}
+$('#bSet').onclick = () => doPower(+radio('pmode'), 'Set');
+$('#bApply').onclick = () => doPower(0x80 | (radio('vin') === 'bat' ? 0x40 : 0) | 0x10 | 0x02 | (radio('sync') === 'log' ? 1 : 0), 'Apply', V.val);
+$('#bReset').onclick = async () => { const r = await api({action:'reset_errors'}); msg(r.ok ? 'Errors reset' : 'Reset failed: ' + r.error); };
+
+/* ---------------- output voltage setter ---------------- */
+const PLACES = [1000, 100, 10, 1];
+const V = {val:3121, dev:null, sel:3, dirty:false, inflight:false, queued:false, lastUser:0};
+const vmax = () => Math.max(1800, Math.min(5200, Math.round(+S.vmax || 5200)));
+function vClamp(mv){
+  mv = Math.round(mv);
+  if (mv > vmax() && mv > V.val) mv = Math.max(vmax(), V.val);   // never raise above the Limit
+  return Math.max(1800, Math.min(5200, mv));
+}
+function setV(mv, typed){
+  if (!devOk()) return;
+  const nv = vClamp(mv);
+  V.lastUser = performance.now();
+  if (nv === V.val && !typed) { renderV(); return; }
+  V.val = nv;
+  if (S.instant && !typed) { V.dirty = false; sendV(); }
+  else V.dirty = typed ? true : (V.val !== V.dev);
+  renderV();
+}
+async function sendV(){
+  if (V.inflight) { V.queued = true; renderV(); return; }
+  V.inflight = true; renderV();
+  try {
+    do {
+      V.queued = false;
+      const mv = V.val, t0 = performance.now();
+      const r = await api({action:'power', ctrl:0x10, mv});
+      if (!r.ok) { msg('Voltage not applied: ' + r.error); break; }
+      st.status = r.status; V.dev = r.status.vout_mV; meterUpdate();
+      msg('Output voltage ' + (mv / 1000).toFixed(3) + ' V' + (r.pending ? ' (sent during the measurement)' : ''));
+      const wait = 100 - (performance.now() - t0);
+      if (V.queued && wait > 0) await sleep(wait);   // at most ~10 updates a second
+    } while (V.queued);
+  } finally { V.inflight = false; V.lastUser = performance.now(); renderV(); }
+}
+function applyV(){ V.dirty = false; if (S.instant) sendV(); else doPower(0x10, 'Set voltage', V.val); }
+function revertV(){ if (V.dev != null) V.val = V.dev; V.dirty = false; renderV(); }
+function renderV(){
+  const s = String(Math.round(V.val)).padStart(4, '0').slice(-4);
+  $$('#vdigits .dg').forEach((dg, i) => { dg.querySelector('.d').textContent = s[i]; dg.classList.toggle('sel', i === V.sel); });
+  const mx = Math.max(vmax(), V.val), sl = $('#vslider');
+  sl.max = mx; sl.value = V.val; $('#vmaxl').textContent = (mx / 1000).toFixed(3) + ' V';
+  const vs = $('#vstate'); let t, c;
+  if (!devOk()) { t = 'REAMP not connected'; c = 'busy'; }
+  else if (V.inflight || V.queued) { t = 'Applying…'; c = 'busy'; }
+  else if (V.dirty) { t = S.instant ? 'Typed – press Enter to apply' : 'Not applied – press Set voltage or Enter'; c = 'pend'; }
+  else if (V.dev != null && V.dev === V.val) { t = '✓ REAMP set to ' + (V.dev / 1000).toFixed(3) + ' V'; c = 'ok'; }
+  else { t = V.dev != null ? 'REAMP set to ' + (V.dev / 1000).toFixed(3) + ' V' : ''; c = 'busy'; }
+  vs.textContent = t; vs.className = 'vstate ' + c;
+  const q = Math.floor(V.val / 25) * 25;   // measured on this REAMP: the output steps down to a multiple of 25 mV
+  $('#vq').textContent = V.val % 25 ? `Output moves in 25 mV steps: ${(V.val / 1000).toFixed(3)} V gives about ${(q / 1000).toFixed(3)} V` : '';
+  $('#bSetV').style.visibility = S.instant ? 'hidden' : '';
+  $('#bSetV').classList.toggle('primary', V.dirty && !S.instant);
+  $('#vdigits').classList.toggle('locked', !devOk());
+}
+function holdRepeat(btn, fn){
+  let t1 = null, t2 = null; const stop = () => { clearTimeout(t1); clearInterval(t2); t1 = t2 = null; };
+  btn.addEventListener('mousedown', e => { e.preventDefault(); if (e.button) return; fn(); t1 = setTimeout(() => { t2 = setInterval(fn, 90); }, 420); });
+  btn.addEventListener('mouseup', stop); btn.addEventListener('mouseleave', stop);
+}
+$$('#vdigits .dg').forEach(dg => {
+  const i = +dg.dataset.i;
+  dg.addEventListener('wheel', e => { e.preventDefault(); if (!devOk()) return; V.sel = i; setV(V.val + (e.deltaY < 0 ? 1 : -1) * PLACES[i]); }, {passive:false});
+  dg.querySelector('.d').addEventListener('mousedown', e => { e.preventDefault(); V.sel = i; $('#vdigits').focus(); renderV(); });
+  holdRepeat(dg.querySelector('.up'), () => { V.sel = i; setV(V.val + PLACES[i]); });
+  holdRepeat(dg.querySelector('.dn'), () => { V.sel = i; setV(V.val - PLACES[i]); });
+});
+$('#vdigits').addEventListener('keydown', e => {
+  const k = e.key;
+  if (k === 'ArrowUp' || k === 'ArrowDown') { e.preventDefault(); setV(V.val + (k === 'ArrowUp' ? 1 : -1) * PLACES[V.sel]); }
+  else if (k === 'PageUp' || k === 'PageDown') { e.preventDefault(); setV(V.val + (k === 'PageUp' ? 100 : -100)); }
+  else if (k === 'ArrowLeft') { e.preventDefault(); V.sel = Math.max(0, V.sel - 1); renderV(); }
+  else if (k === 'ArrowRight') { e.preventDefault(); V.sel = Math.min(3, V.sel + 1); renderV(); }
+  else if (/^[0-9]$/.test(k)) { e.preventDefault(); const d = String(V.val).padStart(4, '0').split(''); d[V.sel] = k; V.sel = Math.min(3, V.sel + 1); setV(+d.join(''), true); }
+  else if (k === 'Enter') { e.preventDefault(); applyV(); }
+  else if (k === 'Escape') { e.preventDefault(); revertV(); }
+});
+$('#vslider').addEventListener('input', e => setV(+e.target.value));
+$('#chkInstant').onchange = e => { S.instant = e.target.checked; saveS(); renderV(); };
+$('#inVmax').onchange = e => { S.vmax = Math.max(1800, Math.min(5200, Math.round(+e.target.value || 3300))); e.target.value = S.vmax; saveS(); renderV(); };
+$('#bSetV').onclick = () => applyV();
+
+/* ---------------- run control ---------------- */
+async function startMeas(trig){
+  if (st.busy) return;
+  const chans = channelsSel(); if (!chans.length) return msg('Select at least one channel');
+  const p = period();
+  if (p === 1 && chans.length > 1) return msg('10 kHz works with one channel only - choose 5 kHz or fewer channels');
+  st.lastTrig = trig; st.busy = true; updateRunUI();
+  msg(trig ? 'Arming TRIG...' : 'Starting...');
+  try {
+    const r = await api({action:'start', channels:chans, period:p, trig, delay: +$('#inDelay').value || 0,
+                         duration: S.meas || null, save:true});
+    if (!r.ok) return msg('Could not start: ' + r.error);
+    st.capId = r.cap; st.follow = true; st.needEnv = true; st.ovAt = 0;
+    st.view = {t0:0, t1:S.show}; if (S.markers) placeMarkers();
+  } finally { st.busy = false; updateRunUI(); }
+}
+async function stopMeas(){
+  if (st.busy) return; st.busy = true; updateRunUI();
+  try { const r = await api({action:'stop'}); if (!r.ok) msg('Stop failed: ' + r.error); }
+  finally { st.busy = false; updateRunUI(); }
+}
+function toggleRun(){ if (logging()) return stopMeas(); if (devOk()) return startMeas(null); }
+async function restartMeas(){
+  if (st.busy || !devOk()) return;
+  const trig = st.lastTrig ?? null;
+  if (logging()) {
+    st.busy = true; updateRunUI(); msg('Restarting...');
+    try { const r = await api({action:'stop'}); if (!r.ok) { msg('Stop failed: ' + r.error); return; } }
+    finally { st.busy = false; }
+  }
+  await startMeas(trig);
+}
+const runBtn = (id, fn) => $(id).addEventListener('click', e => { e.currentTarget.blur(); fn(); });
+runBtn('#bStart', () => startMeas(null));
+runBtn('#bTrig', () => startMeas((+$('#inDelay').value || 0) > 0 ? 'delay' : 'edge'));
+runBtn('#bLevel', () => startMeas('level'));
+runBtn('#bStop', stopMeas);
+runBtn('#bRunToggle', toggleRun);
+runBtn('#bRestart', restartMeas);
+const ICON_PLAY = '<svg viewBox="0 0 20 20"><path class="fillc" d="M6 3.5l11 6.5-11 6.5z"/></svg>';
+const ICON_STOP = '<svg viewBox="0 0 20 20"><rect class="fillc" x="4.5" y="4.5" width="11" height="11" rx="1"/></svg>';
+function updateRunUI(){
+  const lg = logging(), ok = devOk(), armed = !!(st.dev && st.dev.armed), busy = st.busy;
+  const lc = logCap() || {}, mode = lc.mode || '';
+  const isLevel = /level/.test(mode), isTrig = /^TRIG/.test(mode) && !isLevel, isStart = lg && !isLevel && !isTrig;
+  const bS = $('#bStart'), bT = $('#bTrig'), bL = $('#bLevel'), bX = $('#bStop');
+  bS.disabled = bT.disabled = bL.disabled = lg || !ok || busy;
+  bX.disabled = !lg || busy;
+  bS.classList.toggle('running', isStart);
+  bT.classList.toggle('running', lg && isTrig && !armed); bT.classList.toggle('armed', lg && isTrig && armed);
+  bL.classList.toggle('running', lg && isLevel && !armed); bL.classList.toggle('armed', lg && isLevel && armed);
+  bS.lastElementChild.textContent = isStart ? 'Running' : 'Start';
+  bT.lastElementChild.textContent = lg && isTrig ? (armed ? 'Waiting' : 'Running') : 'TRIG';
+  bL.lastElementChild.textContent = lg && isLevel ? (armed ? 'Waiting' : 'Running') : 'TRIG level';
+  const tg = $('#bRunToggle'), key = (lg ? 'L' : 'S') + (armed ? 'A' : '');
+  if (tg.dataset.k !== key) { tg.dataset.k = key; tg.innerHTML = lg ? ICON_STOP : ICON_PLAY; }
+  tg.disabled = busy || (!lg && !ok); tg.classList.toggle('stop', lg && !armed); tg.classList.toggle('armed', lg && armed);
+  $('#bRestart').disabled = busy || !ok;
+  const bd = $('#runBadge'), sub = $('#runSub');
+  let cls, txt, s2;
+  if (!ok && !lg) { cls = 'offline'; txt = 'OFFLINE'; s2 = 'check the USB cable'; }
+  else if (lg && armed) { cls = 'armed'; txt = 'ARMED'; s2 = 'waiting for TRIG'; }
+  else if (lg) { cls = 'run'; txt = '● MEASURING'; s2 = fmtClock(lc.dur) + '  ·  ' + (lc.dt ? (1 / lc.dt / 1000).toFixed(3) + ' kHz' : ''); }
+  else { cls = 'ready'; txt = 'READY'; s2 = 'Space = Start'; }
+  if (bd.className !== 'badge ' + cls) bd.className = 'badge ' + cls;
+  if (bd.textContent !== txt) bd.textContent = txt;
+  sub.textContent = s2;
+}
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.altKey || e.metaKey || e.repeat) return;
+  const t = e.target, tag = (t.tagName || '').toLowerCase();
+  if (['input', 'select', 'textarea', 'button'].includes(tag) || t.id === 'vdigits' || document.querySelector('dialog[open]')) return;
+  if (e.code === 'Space') { e.preventDefault(); toggleRun(); }
+  else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); restartMeas(); }
+  else if (e.key === 'f' || e.key === 'F') { e.preventDefault(); resetZoom(); }
+});
+
+function syncControls(force){
+  const s = st.status; if (!s) return;
+  V.dev = s.vout_mV;
+  const quiet = !V.dirty && !V.inflight && !V.queued && (force || performance.now() - V.lastUser > 1500);
+  if (quiet || !st.inited) V.val = s.vout_mV;
+  if (force || !st.inited) {
+    if (s.out === 4 || s.out === 8 || s.out === 12) setRadio('pmode', s.out);
+    setRadio('vin', s.source === 'battery' ? 'bat' : 'usb');
+    st.inited = true;
+  }
+  renderV();
+}
+function setEnabled(){
+  const lg = logging(), ok = devOk();
+  $$('#paneControl input, #paneControl select, #paneControl button, #inDelay').forEach(el => {
+    if (el.id === 'inPeriod') el.disabled = lg || !$('#chkCustom').checked;
+    else if (el.id === 'selRate') el.disabled = lg || $('#chkCustom').checked;
+    else if (el.id === 'mul1' || el.id === 'mul2' || el.classList.contains('smsel') || el.id === 'chkInstant' || el.id === 'inVmax') el.disabled = false;
+    else if (el.name === 'pmode' || ['bSet', 'bSetV', 'bReset', 'vslider'].includes(el.id) || el.closest('#vdigits')) el.disabled = !ok;
+    else el.disabled = lg || !ok;
+  });
+}
+
+/* ---------------- big readouts + status pane ---------------- */
+function pushStatus(s){
+  if (!s || s.t == null || s.t === st.lastStatT) return;
+  st.lastStatT = s.t; st.sq.push(s); while (st.sq.length > 4) st.sq.shift();
+}
+function statMean(key){
+  const last = st.sq.length ? st.sq[st.sq.length - 1].t : 0, a = st.sq.filter(x => x[key] != null && last - x.t < 1.3);
+  return a.length ? a.reduce((p, x) => p + x[key], 0) / a.length : null;
+}
+function fmtCurrent(uA){
+  if (uA == null || !isFinite(uA)) return ['—', 'µA'];
+  const a = Math.abs(uA), f = (v, u) => [(Math.abs(v) < 0.0005 ? 0 : v).toFixed(Math.abs(v) < 10 ? 3 : Math.abs(v) < 100 ? 2 : 1), u];
+  return a < 1000 ? f(uA, 'µA') : a < 1e6 ? f(uA / 1000, 'mA') : f(uA / 1e6, 'A');
+}
+function chValue(c){
+  // [value in uA (c=0) or mV (c>0), description]
+  const lc = logCap();
+  if (lc) {
+    if (!lc.channels.includes(c)) return [null, 'not being logged'];
+    const r = st.recent && st.recent[String(c)];
+    return [r ? r[2] : null, r && r[3] != null ? `0.3 s avg · ${fmtAC(c, r[3])} rms` : 'last 0.3 s average'];
+  }
+  if (!st.status || !devOk()) return [null, ''];
+  const v = statMean(c === 0 ? 'current_mA' : c === 1 ? 'vin1_mV' : 'vin2_mV');
+  return [v == null ? null : (c === 0 ? v * 1000 : v), 'status reading, ~1 s average'];
+}
+function meterUpdate(){
+  const s = st.status, lg = logging();
+  { const [v, d] = chValue(0), [t, u] = fmtCurrent(v); $('#mv0').textContent = t; $('#mu0').textContent = u; $('#ms0').textContent = d; }
+  for (const c of [1, 2]) { const [v, d] = chValue(c); $('#mv' + c).textContent = v == null ? '—' : (Math.abs(v) < 0.5 ? 0 : v * (S.mult[c] || 1) / 1000).toFixed(3); $('#ms' + c).textContent = d; }
+  const so = $('#msOut');
+  if (s && devOk()) {
+    $('#mvOut').textContent = (s.vout_mV / 1000).toFixed(3);
+    const src = s.source === 'battery' ? 'battery' : 'USB';
+    if (s.out === 8) { so.textContent = 'ON · ' + src; so.className = 'msub on'; }
+    else if (s.out === 12) { so.textContent = (lg ? 'DELAYED · on now' : 'DELAYED · off until Start') + ' · ' + src; so.className = 'msub del'; }
+    else if (s.out === 4) { so.textContent = 'OFF · ' + src; so.className = 'msub offr'; }
+    else { so.textContent = src; so.className = 'msub'; }
+    if (s.flags & 0x7b) { so.textContent = 'ERROR · see Reset errors'; so.className = 'msub offr'; }
+    const sup = lg ? s.supply_mV : (statMean('supply_mV') ?? s.supply_mV);
+    $('#mvSup').textContent = (sup / 1000).toFixed(2); $('#msSup').textContent = s.source === 'battery' ? 'internal battery' : 'from USB';
+  } else { $('#mvOut').textContent = '--'; so.textContent = ''; $('#mvSup').textContent = '--'; $('#msSup').textContent = ''; }
+}
+function setReadout(id, v, unitId, base){
+  let txt = '--', unit = '';
+  if (v != null && isFinite(v)) {
+    if (base === 'uA') { const [u, f] = curUnit(v); txt = fmtNum(v * f, autoDec(v * f)); unit = u; }
+    else { if (Math.abs(v) >= 1000) { txt = fmtNum(v / 1000, 2); unit = 'V'; } else { txt = fmtNum(v, 2); unit = 'mV'; } }
+  }
+  $('#' + id).textContent = txt; if (unitId) $('#' + unitId).textContent = unitId.slice(2) === '0' ? `#0: ${unit || 'µA'}` : `#${unitId.slice(2)}: ${unit || 'V'}`;
+}
+function updateStatusPane(){   // TRIG / SYNC / error lights in the readout strip (replaces the old Status pane)
+  const s = st.status, ok = devOk() && !!s, pins = s ? s.pins : 0, err = ok && (s.flags & 0x7b);
+  const set = (id, cls, txt) => { const e = $('#' + id); if (e.className !== 'sig ' + cls) e.className = 'sig ' + cls; if (txt && e.textContent !== txt) e.textContent = txt; };
+  set('sgTrig', ok && !(pins & 0x10) ? 'on' : '');
+  set('sgSync', ok && (pins & 0x20) ? 'on' : '');
+  set('sgErr', !ok ? '' : err ? 'bad' : 'on', err ? 'ERROR' : 'OK');
+  $('#msSig').textContent = ok && logging() ? 'not updated while measuring' : '';
+  $('#errRow').style.display = err ? '' : 'none';
+}
+
+/* ---------------- capture tabs ---------------- */
+function renderTabs(){
+  const box = $('#tabs'); const key = st.caps.map(c => c.id + (c.running ? '*' : '') + c.name).join('|') + '#' + st.capId;
+  if (box.dataset.key === key) return; box.dataset.key = key; box.innerHTML = '';
+  for (const c of st.caps) {
+    const t = document.createElement('div'); t.className = 'ctab' + (c.id === st.capId ? ' sel' : '');
+    t.innerHTML = `<span>${c.running ? '*' : ''}${c.name}</span><span class="x" title="Close">&#10005;</span>`;
+    t.onclick = e => {
+      if (e.target.classList.contains('x')) { if (c.running) return msg('Stop measuring before closing this tab'); api({action:'close_capture', id:c.id}); if (st.capId === c.id) st.capId = null; return; }
+      selectCap(c.id);
+    };
+    box.appendChild(t);
+  }
+}
+function selectCap(id){
+  st.capId = id; const c = curCap(); st.ov = null; st.ovAt = 0; st.env = null; st.needEnv = true;
+  if (c) { if (c.running) st.follow = true; else { st.follow = false; st.view = {t0:0, t1:Math.max(c.dur, c.dt*10)}; } }
+  if (S.markers) placeMarkers();
+  fillSmooth();
+}
+
+/* ---------------- polling loop ---------------- */
+const AW = 58;   // width of one Y-axis column
+st.yman = {};    // manual Y range per channel (raw units: uA / mV); missing = automatic
+function axisSides(cap){   // channels per side, listed inner -> outer
+  const ch = cap ? cap.channels : [0], isL = c => S.side[c] === 'L';
+  return {L: ch.filter(isL).sort((a, b) => a - b), R: ch.filter(c => !isL(c)).sort((a, b) => b - a)};
+}
+function plotRect(){
+  const cv = $('#chart'), W = cv.clientWidth, H = cv.clientHeight, cap = curCap(), sd = axisSides(cap);
+  const left = 16 + sd.L.length * AW, right = 14 + sd.R.length * AW;
+  return {x:left, y:36, w:Math.max(50, W - left - right), h:Math.max(40, H - 36 - 58), W, H, sd};
+}
+function placeMarkers(){
+  const cap = curCap(), v = st.view;
+  const end = cap && !cap.running ? Math.min(v.t1, Math.max(cap.dur, cap.dt * 10)) : v.t1, sp = end - v.t0;
+  st.m.t1 = v.t0 + sp * 0.3; st.m.t2 = v.t0 + sp * 0.7;
+}
+function smParam(cap){ return cap.channels.filter(c => S.smooth[c] > 0).map(c => c + ':' + smW(S.smooth[c])).join(','); }
+async function poll(){
+  const t0 = performance.now();
+  try {
+    const cap = curCap(), q = new URLSearchParams();
+    if (cap) {
+      if (cap.running && st.follow) { const t1 = Math.max(cap.dur, S.show); st.view = {t0: Math.max(0, t1 - S.show), t1}; }
+      const n = Math.max(50, Math.round(plotRect().w)), sm = smParam(cap);
+      const key = `${cap.id}|${st.view.t0.toFixed(6)}|${st.view.t1.toFixed(6)}|${n}|${sm}`;
+      q.set('cap', cap.id);
+      if (cap.running || st.needEnv || key !== st.envKey) { q.set('t0', st.view.t0); q.set('t1', st.view.t1); q.set('n', n); if (sm) q.set('sm', sm); st.envKey = key; st.needEnv = false; }
+      if (!st.ov || (cap.running && performance.now() - st.ovAt > 1000)) { q.set('ov', Math.max(100, Math.round($('#nav').clientWidth || 600))); st.ovAt = performance.now(); }
+      if (S.markers && st.m.t1 != null) { q.set('m1', st.m.t1); q.set('m2', st.m.t2); }
+      if ($('#dlgCalc').open) { q.set('vis', 1); if (!q.has('t0')) { q.set('t0', st.view.t0); q.set('t1', st.view.t1); q.set('n', n); if (sm) q.set('sm', sm); }
+        q.set('cyc', +$('#inCyc').value || 1); q.set('cyc0', S.markers && st.m.t1 != null ? Math.min(st.m.t1, st.m.t2) : 0); }
+    }
+    const f = await (await fetch('/api/frame?' + q)).json();
+    apply(f);
+  } catch (e) { st.dev = null; msg('Lost contact with reamp_app.py - is it still running?'); document.title = 'REAMP Logger (offline)'; updateRunUI(); }
+  const lg = logging();
+  setTimeout(poll, Math.max(0, (lg ? 60 : 220) - (performance.now() - t0)));
+}
+function apply(f){
+  const wasRun = st.lastRun;
+  st.dev = f.dev; st.status = f.status || st.status; st.caps = f.caps; pushStatus(f.status);
+  if (f.env) st.env = f.env;
+  if (f.ov) st.ov = f.ov;
+  st.full = f.full || null; st.win = f.win || null; st.recent = f.recent || null;
+  if (f.vis) st.vis = f.vis; if (f.cyc) st.cyc = f.cyc;
+  if (st.capId != null && !curCap()) st.capId = null;
+  if (st.capId == null && st.caps.length) selectCap(st.caps[st.caps.length - 1].id);
+  const cap = curCap();
+  if (f.dev.logging && st.lastLogId !== f.dev.logging) {   // a new measurement started: show it (once; older tabs stay viewable)
+    st.lastLogId = f.dev.logging; if (st.capId !== f.dev.logging) selectCap(f.dev.logging);
+  }
+  if (cap && wasRun && !cap.running) {
+    st.needEnv = true; st.ovAt = 0; st.ov = null;
+    if (S.markers && st.m.t1 != null && Math.max(st.m.t1, st.m.t2) > cap.dur) placeMarkers();
+  }
+  st.lastRun = cap ? cap.running : null;
+  const d = f.dev;
+  document.title = d.connected ? (d.logging ? '● Measuring - REAMP' : d.demo ? 'REAMP connected (DEMO)' : 'REAMP connected') : 'REAMP not connected';
+  if (d.msg !== st.lastDevMsg) { st.lastDevMsg = d.msg; st.localMsgUntil = 0; }   // a new device message replaces older action messages
+  if (!(performance.now() < (st.localMsgUntil || 0))) $('#sbmsg').textContent = d.msg || '';
+  $('#sbright').textContent = d.connected ? `${d.demo ? 'DEMO  •  ' : ''}${d.info || ''}  •  S/N ${d.serial}  •  timebase ${d.calibrated ? 'calibrated' : 'nominal'}` : '';
+  syncControls(false); setEnabled(); updateRunUI(); meterUpdate(); updateStatusPane(); renderTabs(); rateText();
+  if ($('#dlgCalc').open) updateCalc();
+  draw();
+}
+
+/* ---------------- chart drawing ---------------- */
+function prepCanvas(cv){
+  const r = cv.getBoundingClientRect(), w = cv.clientWidth, h = cv.clientHeight;
+  const k = (w && r.width) ? r.width / w : 1, dpr = (window.devicePixelRatio || 1) * k;
+  const W = Math.max(1, Math.min(16384, Math.round(w * dpr))), H = Math.max(1, Math.min(16384, Math.round(h * dpr)));
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  const ctx = cv.getContext('2d'); ctx.setTransform(W / Math.max(1, w), 0, 0, H / Math.max(1, h), 0, 0); return ctx;
+}
+function series(cap){
+  const e = st.env, out = {};
+  if (!e || !cap || e.mode === 'empty') return out;
+  for (const c of cap.channels) {
+    const d = e.ch[String(c)]; if (!d) continue;
+    if (e.mode === 'raw') { const t = d.map((_, j) => (e.i0 + j) * e.dt); out[c] = {t, lo:d, hi:d, mean:d, raw:true}; }
+    else { const t = e.edges.map(i => i * e.dt); out[c] = {t, lo:d[0], hi:d[1], mean:d[2], raw:false, w:(e.edges[1]-e.edges[0])*e.dt}; }
+  }
+  return out;
+}
+function yRange(c, s){
+  let lo = Infinity, hi = -Infinity;
+  for (let i = 0; i < s.lo.length; i++) { const a = s.lo[i], b = s.hi[i]; if (a != null && a < lo) lo = a; if (b != null && b > hi) hi = b; }
+  if (!isFinite(lo)) { lo = 0; hi = 1; }
+  if (c === 0 && lo >= 0) lo = 0;
+  if (hi - lo < 1e-9) { hi += Math.max(1, Math.abs(hi) * 0.1); lo -= c === 0 ? 0 : Math.max(1, Math.abs(lo) * 0.1); }
+  const pad = (hi - lo) * 0.06; hi += pad; if (!(c === 0 && lo === 0)) lo -= pad;
+  return [lo, hi];
+}
+function draw(){ drawChart(); drawNav(); updateReport(); updateMarkerUI(); }
+function drawChart(){
+  const cv = $('#chart'), ctx = prepCanvas(cv), R = plotRect(), cap = curCap();
+  const bgDark = isDark(S.bg); const axisFg = bgDark ? '#ddd' : '#000', gridC = bgDark ? '#444' : '#d8d8d8';
+  ctx.fillStyle = S.bg; ctx.fillRect(0, 0, R.W, R.H);
+  if (!cap) {
+    ctx.fillStyle = bgDark ? '#aaa' : '#888'; ctx.font = '14px "Segoe UI",sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(devOk() ? 'Press ▶ Start (or Space) to measure, or Open a saved log' : 'Waiting for the REAMP...', R.W / 2, R.H / 2);
+    $('#tipbox').style.display = 'none'; st._R = R; st._ser = {}; st._axes = {}; st._axPos = {}; placeAxisButtons(null, R); return;
+  }
+  const v = st.view, sp = Math.max(1e-9, v.t1 - v.t0), X = t => R.x + (t - v.t0) / sp * R.w;
+  const ser = series(cap);
+  ctx.font = 'bold 13px "Segoe UI",sans-serif'; ctx.fillStyle = bgDark ? '#9a9a9a' : '#8a8a8a'; ctx.textAlign = 'left';
+  const khz = (10 / cap.period).toFixed(3), tr = (1 / cap.dt / 1000);
+  const trueTxt = Math.abs(tr - 10 / cap.period) / (10 / cap.period) > 0.001 ? `, true ${tr.toFixed(3)} kHz` : '';
+  const smTxt = cap.channels.filter(c => S.smooth[c] > 0).map(c => `#${c} ${smW(S.smooth[c])} pts`).join(', ');
+  ctx.fillText(`Channels: ${cap.channels.map(c => '#' + c).join(', ')},  Sample rate: ${cap.period}(${khz} kHz${trueTxt}),  Measurement time: ${cap.dur.toFixed(2)}s` +
+               (smTxt ? `,  Smoothed: ${smTxt}` : ''), R.x + 30, 22);
+  // x grid + axis
+  const target = Math.max(4, R.w / 95), step = niceStep(sp / target), minor = step / 5;
+  const anchorStep = step * 10;
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = gridC; ctx.setLineDash([2, 3]);
+  for (let t = Math.ceil(v.t0 / step) * step; t <= v.t1 + 1e-12; t += step) { const x = Math.round(X(t)) + 0.5; ctx.beginPath(); ctx.moveTo(x, R.y); ctx.lineTo(x, R.y + R.h); ctx.stroke(); }
+  ctx.setLineDash([]);
+  ctx.strokeStyle = axisFg; ctx.beginPath(); ctx.moveTo(R.x, R.y + R.h + 0.5); ctx.lineTo(R.x + R.w, R.y + R.h + 0.5); ctx.stroke();
+  for (let t = Math.ceil(v.t0 / minor) * minor; t <= v.t1 + 1e-12; t += minor) { const x = Math.round(X(t)) + 0.5; ctx.beginPath(); ctx.moveTo(x, R.y + R.h); ctx.lineTo(x, R.y + R.h + 3); ctx.stroke(); }
+  ctx.font = '11px "Segoe UI",sans-serif'; ctx.fillStyle = axisFg; ctx.textAlign = 'center';
+  const unitOf = s => s < 1e-3 ? ['µs', 1e6] : s < 1 ? ['ms', 1e3] : ['s', 1];
+  const [tu, tf] = unitOf(step);
+  for (let k = Math.ceil(v.t0 / step); k * step <= v.t1 + 1e-12; k++) {
+    const t = k * step, x = X(t); ctx.beginPath(); ctx.moveTo(Math.round(x) + 0.5, R.y + R.h); ctx.lineTo(Math.round(x) + 0.5, R.y + R.h + 6); ctx.stroke();
+    const isAnchor = Math.abs(t / anchorStep - Math.round(t / anchorStep)) < 1e-6;
+    if (isAnchor && (x - R.x < 70 || R.x + R.w - x < 70)) { /* start/end labels already show it */ }
+    else if (isAnchor) { ctx.font = 'bold 12px "Segoe UI",sans-serif'; ctx.fillText(t.toFixed(Math.max(3, -Math.floor(Math.log10(step)))) + 's', x, R.y + R.h + 30); ctx.font = '11px "Segoe UI",sans-serif'; }
+    else { const rel = t - Math.floor(t / anchorStep + 1e-9) * anchorStep; ctx.fillText('+' + +(rel * tf).toFixed(3) + tu, x, R.y + R.h + 18); }
+  }
+  ctx.font = 'bold 12px "Segoe UI",sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText('<' + v.t0.toFixed(3) + 's', Math.max(2, R.x - 32), R.y + R.h + 30);
+  // y axes + traces
+  const axes = {};
+  for (const c of cap.channels) {
+    const s = ser[c]; if (!s) continue;
+    let [lo, hi] = st.yman[c] ? [st.yman[c].lo, st.yman[c].hi] : yRange(c, s);
+    const [unit, fct] = chUnit(c, Math.max(Math.abs(lo), Math.abs(hi)));
+    axes[c] = {lo, hi, unit, fct, Y: val => R.y + R.h - (val - lo) / (hi - lo) * R.h};
+  }
+  ctx.save(); ctx.beginPath(); ctx.rect(R.x, R.y - 2, R.w, R.h + 4); ctx.clip();
+  for (const c of [...cap.channels].reverse()) {
+    const s = ser[c], A = axes[c]; if (!s || !A) continue;
+    const col = COL(c);
+    if (!s.raw) {
+      ctx.strokeStyle = col; ctx.globalAlpha = 0.3; ctx.lineWidth = 1; ctx.beginPath();
+      for (let i = 0; i < s.t.length; i++) { if (s.lo[i] == null) continue; const x = Math.round(X(s.t[i] + s.w / 2)) + 0.5; ctx.moveTo(x, A.Y(s.hi[i])); ctx.lineTo(x, A.Y(s.lo[i]) + 0.5); }
+      ctx.stroke(); ctx.globalAlpha = 1;
+    }
+    ctx.strokeStyle = col; ctx.lineWidth = S.smooth[c] ? 1.6 : 1.2; ctx.beginPath(); let pen = false;
+    for (let i = 0; i < s.t.length; i++) {
+      const m = s.mean[i]; if (m == null) { pen = false; continue; }
+      const x = X(s.t[i] + (s.raw ? 0 : s.w / 2)), y = A.Y(m);
+      if (pen) ctx.lineTo(x, y); else { ctx.moveTo(x, y); pen = true; }
+    }
+    ctx.stroke();
+    if (s.raw && s.t.length > 1 && (X(s.t[1]) - X(s.t[0])) > 7) { ctx.fillStyle = col; for (let i = 0; i < s.t.length; i++) if (s.mean[i] != null) { ctx.fillRect(X(s.t[i]) - 1.5, A.Y(s.mean[i]) - 1.5, 3, 3); } }
+  }
+  if (S.markers && st.m.t1 != null) {
+    ctx.strokeStyle = '#2e8b57'; ctx.lineWidth = 1;
+    for (const t of [st.m.t1, st.m.t2]) { const x = Math.round(X(t)) + 0.5; ctx.beginPath(); ctx.moveTo(x, R.y); ctx.lineTo(x, R.y + R.h); ctx.stroke(); }
+  }
+  if (st.hoverT != null) { const x = Math.round(X(st.hoverT)) + 0.5; ctx.strokeStyle = bgDark ? '#777' : '#999'; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(x, R.y); ctx.lineTo(x, R.y + R.h); ctx.stroke(); ctx.setLineDash([]); }
+  if (st.sel) { const a = X(Math.min(st.sel.a, st.sel.b)), b = X(Math.max(st.sel.a, st.sel.b)); ctx.fillStyle = 'rgba(0,120,215,0.15)'; ctx.fillRect(a, R.y, b - a, R.h); ctx.strokeStyle = 'rgba(0,120,215,0.7)'; ctx.strokeRect(a + 0.5, R.y + 0.5, b - a, R.h); }
+  ctx.restore();
+  const drawAxis = (c, x, side) => {
+    const A = axes[c]; if (!A) return; const col = COL(c);
+    ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x + 0.5, R.y); ctx.lineTo(x + 0.5, R.y + R.h); ctx.stroke();
+    const lo = A.lo * A.fct, hi = A.hi * A.fct, stp = niceStep((hi - lo) / Math.max(3, R.h / 42)), mn = stp / 5;
+    for (let val = Math.ceil(lo / mn) * mn; val <= hi + 1e-12; val += mn) { const y = Math.round(A.Y(val / A.fct)) + 0.5; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + side * 3, y); ctx.stroke(); }
+    ctx.font = '11px "Segoe UI",sans-serif'; ctx.textAlign = 'center';
+    const dec = Math.max(0, -Math.floor(Math.log10(stp) + 1e-9));
+    for (let val = Math.ceil(lo / stp) * stp; val <= hi + 1e-12; val += stp) {
+      const y = A.Y(val / A.fct); ctx.beginPath(); ctx.moveTo(x, Math.round(y) + 0.5); ctx.lineTo(x + side * 6, Math.round(y) + 0.5); ctx.stroke();
+      ctx.save(); ctx.translate(x + side * 14, y); ctx.rotate(-Math.PI / 2); ctx.fillText((Math.abs(val) < stp / 1e6 ? 0 : val).toFixed(Math.min(dec, 4)), 0, 4); ctx.restore();
+    }
+    ctx.save(); ctx.translate(x + side * 34, R.y + R.h / 2); ctx.rotate(-Math.PI / 2); ctx.font = '12px "Segoe UI",sans-serif';
+    ctx.fillText(`#${c}: ${c === 0 ? 'Current' : 'Voltage'}, ${A.unit}` + (st.yman[c] ? '  (manual)' : ''), 0, 4); ctx.restore();
+  };
+  st._axPos = {};
+  R.sd.L.forEach((c, i) => { const x = R.x - 1 - i * AW; st._axPos[c] = {x, side:-1}; drawAxis(c, x, -1); });
+  R.sd.R.forEach((c, i) => { const x = R.x + R.w + 1 + i * AW; st._axPos[c] = {x, side:1}; drawAxis(c, x, 1); });
+  if (st.drag === 'axis' && st.axDrag && st.axDrag.mode === 'side') drawAxisDrop(ctx, R);
+  ctx.fillStyle = axisFg; ctx.font = 'bold 12px "Segoe UI",sans-serif'; ctx.textAlign = 'right';
+  ctx.fillText(v.t1.toFixed(3) + 's', R.x + R.w, R.y + R.h + 30);
+  if (cap.running && st.dev && st.dev.armed) { ctx.textAlign = 'center'; ctx.font = 'bold 15px "Segoe UI",sans-serif'; ctx.fillStyle = '#d07000'; ctx.fillText('Waiting for the TRIG signal...', R.x + R.w / 2, R.y + R.h / 2); }
+  st._axes = axes; st._R = R; st._ser = ser;
+  drawTip(cap, X, R);
+  placeAxisButtons(cap, R);
+}
+function drawAxisDrop(ctx, R){   // feedback while an axis is dragged
+  const d = st.axDrag, toLeft = d.x < R.W / 2, col = COL(d.c);
+  const w = Math.max(AW, toLeft ? R.x : R.W - R.x - R.w), xa = toLeft ? 0 : R.W - w;
+  ctx.save(); ctx.globalAlpha = 0.16; ctx.fillStyle = col; ctx.fillRect(xa, R.y, w, R.h); ctx.globalAlpha = 1;
+  ctx.setLineDash([5, 4]); ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.strokeRect(xa + 1, R.y, w - 2, R.h); ctx.setLineDash([]);
+  ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(d.x, R.y); ctx.lineTo(d.x, R.y + R.h); ctx.stroke();
+  ctx.fillStyle = col; ctx.font = 'bold 12px "Segoe UI",sans-serif'; ctx.textAlign = toLeft ? 'left' : 'right';
+  ctx.fillText(`Release to put #${d.c} on the ${toLeft ? 'left' : 'right'}`, toLeft ? R.x + 8 : R.x + R.w - 8, R.y + 16);
+  ctx.restore();
+}
+function axisAt(x, y){
+  const R = st._R; if (!R || !st._axPos || y < R.y || y > R.y + R.h) return null;
+  for (const [c, p] of Object.entries(st._axPos)) { const a = p.x, b = p.x + p.side * AW; if (x >= Math.min(a, b) && x <= Math.max(a, b)) return +c; }
+  return null;
+}
+function moveAxis(c, side){ if (S.side[c] !== side) { S.side[c] = side; saveS(); st.needEnv = true; } fillSides(); draw(); }
+function placeAxisButtons(cap, R){   // small arrow buttons under each Y axis
+  const box = $('#axbtns'), key = cap ? cap.channels.join(',') : '';
+  if (box.dataset.k !== key) {
+    box.dataset.k = key; box.innerHTML = '';
+    for (const c of (cap ? cap.channels : [])) {
+      const b = document.createElement('button'); b.className = 'axbtn'; b.dataset.c = c; b.dataset.help = 'axis';
+      b.addEventListener('mousedown', e => e.stopPropagation());
+      b.addEventListener('click', e => { e.stopPropagation(); e.currentTarget.blur(); hideTip(); moveAxis(c, S.side[c] === 'L' ? 'R' : 'L'); });
+      box.appendChild(b);
+    }
+  }
+  for (const b of box.children) {
+    const c = +b.dataset.c, p = st._axPos && st._axPos[c];
+    if (!p || !st._axes || !st._axes[c]) { b.style.display = 'none'; continue; }
+    b.style.display = ''; b.style.color = COL(c);
+    const t = p.side < 0 ? `#${c} ▶` : `◀ #${c}`; if (b.textContent !== t) b.textContent = t;
+    b.style.left = (p.x + p.side * AW / 2 - b.offsetWidth / 2) + 'px'; b.style.top = (R.y + R.h + 35) + 'px';
+  }
+}
+function isDark(hex){ const h = hex.replace('#',''); const r = parseInt(h.substr(0,2),16), g = parseInt(h.substr(2,2),16), b = parseInt(h.substr(4,2),16); return (r*299 + g*587 + b*114) / 1000 < 110; }
+function statsUnit(c, arr){ return chUnit(c, arr ? Math.max(Math.abs(arr[0]), Math.abs(arr[1])) : 0); }
+function fmtSig(v){ const a = Math.abs(v); if (!isFinite(v)) return '--'; if (a === 0) return '0'; return v.toFixed(Math.max(0, Math.min(4, 2 - Math.floor(Math.log10(a))))); }
+function fmtAC(c, v){   // ripple and p-p in readable units: mV for voltages (times the multiplier), uA / mA for current
+  if (v == null || !isFinite(v)) return '--';
+  if (c === 0) { const [u, f] = curUnit(v); return fmtSig(v * f) + ' ' + u; }
+  return fmtSig(v * (S.mult[c] || 1)) + ' mV';
+}
+function drawTip(cap, X, R){
+  const tb = $('#tipbox');
+  if (!S.markers || !st.win || st.m.t1 == null || !cap.channels.some(c => st.win[String(c)])) { tb.style.display = 'none'; return; }
+  const a = Math.min(st.m.t1, st.m.t2), b = Math.max(st.m.t1, st.m.t2);
+  let s = 'Length: ' + fmtDur(b - a);
+  for (const c of cap.channels) { const w = st.win[String(c)]; if (!w) continue; const [u, f] = statsUnit(c, w);
+    s += `\n#${c}: ${u}\n   min ${fmtNum(w[0]*f, autoDec(w[1]*f))}\n   max ${fmtNum(w[1]*f, autoDec(w[1]*f))}\n   average ${fmtNum(w[2]*f, autoDec(w[1]*f))}` +
+         `\n   p-p ${fmtAC(c, w[1] - w[0])}` + (w[3] != null ? `\n   AC rms ${fmtAC(c, w[3])}` : ''); }
+  tb.textContent = s; tb.style.display = 'block';
+  const x = X(b) + 8, wbox = tb.offsetWidth;
+  tb.style.left = Math.max(R.x + 4, Math.min(x, R.x + R.w - wbox - 4)) + 'px'; tb.style.top = (R.y + 4) + 'px';
+}
+
+/* ---------------- navigation bar ---------------- */
+function drawNav(){
+  const cv = $('#nav'); if (!S.nav || !cv.clientWidth) return;
+  const ctx = prepCanvas(cv), W = cv.clientWidth, H = cv.clientHeight, cap = curCap();
+  const bgDark = isDark(S.bg);
+  ctx.fillStyle = S.bg; ctx.fillRect(0, 0, W, H);
+  if (!cap) { st._nav = null; return; }
+  const L = 18, Rr = W - 18, y0 = 10, y1 = 30, T = Math.max(cap.dur, cap.dt * 2), X = t => L + t / T * (Rr - L);
+  ctx.strokeStyle = bgDark ? '#ddd' : '#000'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(L, y1 + 6.5); ctx.lineTo(Rr, y1 + 6.5); ctx.stroke();
+  const stp = niceStep(T / 8); ctx.fillStyle = bgDark ? '#ddd' : '#000'; ctx.font = '11px "Segoe UI",sans-serif'; ctx.textAlign = 'center';
+  for (let t = 0; t <= T + 1e-9; t += stp / 5) { const x = Math.round(X(t)) + 0.5; const major = Math.abs(t / stp - Math.round(t / stp)) < 1e-6; ctx.beginPath(); ctx.moveTo(x, y1 + 6); ctx.lineTo(x, y1 + (major ? 12 : 9)); ctx.stroke(); if (major) ctx.fillText(t.toFixed(2), x, y1 + 23); }
+  const ov = st.ov, chs = cap.channels, c0 = chs.includes(0) ? 0 : chs[0];
+  if (ov && ov.mode !== 'empty' && ov.ch[String(c0)]) {
+    const d = ov.ch[String(c0)], ts = ov.mode === 'raw' ? d.map((_, j) => (ov.i0 + j) * ov.dt) : ov.edges.map(i => i * ov.dt);
+    const hi = ov.mode === 'raw' ? d : d[1];
+    let top = -Infinity; for (const v of hi) if (v != null && v > top) top = v;
+    const thr = S.thr != null && S.thr !== '' ? +S.thr : top * 0.8;
+    ctx.strokeStyle = '#e00000'; ctx.lineWidth = 1.3; ctx.beginPath(); let prev = null;
+    for (let i = 0; i < ts.length; i++) { const hiV = hi[i]; if (hiV == null) continue; const yy = hiV >= thr ? y0 : y1; const x = X(ts[i]);
+      if (prev === null) ctx.moveTo(x, yy); else { ctx.lineTo(x, prev); ctx.lineTo(x, yy); } prev = yy; }
+    ctx.lineTo(X(T), prev ?? y1); ctx.stroke();
+    $('#thrUnit').textContent = c0 === 0 ? 'µA' : 'mV';
+  }
+  const v = st.view, a = X(Math.max(0, v.t0)), b = X(Math.min(T, v.t1));
+  ctx.fillStyle = 'rgba(0,120,215,0.16)'; ctx.fillRect(a, 2, Math.max(2, b - a), y1 + 4); ctx.strokeStyle = 'rgba(0,120,215,0.6)'; ctx.strokeRect(a + 0.5, 2.5, Math.max(2, b - a), y1 + 4);
+  st._nav = {X, T, L, Rr};
+}
+
+/* ---------------- report & hover ---------------- */
+function rtable(el, title, stats, cap){
+  if (!stats || !cap) { el.innerHTML = ''; return; }
+  let h = `<tr><th>${title}</th><th>Min</th><th>Max</th><th>Average</th><th>p-p</th><th>AC rms</th></tr>`;
+  for (const c of cap.channels) { const s = stats[String(c)]; if (!s) continue; const [u, f] = statsUnit(c, s); const d = autoDec(s[1] * f);
+    h += `<tr style="color:${COL(c)}"><td>#${c}: ${u}</td><td>${fmtNum(s[0]*f,d)}</td><td>${fmtNum(s[1]*f,d)}</td><td>${fmtNum(s[2]*f,d)}</td>` +
+         `<td>${fmtAC(c, s[1] - s[0])}</td><td>${s[3] == null ? '--' : fmtAC(c, s[3])}</td></tr>`; }
+  el.innerHTML = h;
+}
+function updateReport(){
+  if (!S.report) return;
+  const cap = curCap();
+  rtable($('#rt1'), 'Full range', st.full, cap);
+  if (S.markers && st.win && st.m.t1 != null) { const a = Math.min(st.m.t1, st.m.t2), b = Math.max(st.m.t1, st.m.t2); rtable($('#rt2'), `${a.toFixed(3)}s-${b.toFixed(3)}s`, st.win, cap); $('#rt2wrap').style.display = ''; }
+  else $('#rt2wrap').style.display = 'none';
+  updateHover();
+}
+function valueAt(c, t){
+  const s = st._ser && st._ser[c]; if (!s || !s.t.length) return null;
+  let lo = 0, hi = s.t.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (s.t[m] <= t) lo = m; else hi = m - 1; }
+  return s.mean[lo];
+}
+function updateHover(){
+  const cap = curCap(), el = $('#hover');
+  if (!cap || st.hoverT == null) { if (cap) el.innerHTML = `<span style="color:var(--muted)">#0..#2: hover over the chart &nbsp; Time: --</span>`; return; }
+  let h = '';
+  for (const c of cap.channels) { const v = valueAt(c, st.hoverT); const A = st._axes && st._axes[c]; if (!A) continue;
+    h += `<span style="color:${COL(c)}">#${c}: ${v == null ? '--' : fmtNum(v * A.fct, autoDec(A.hi * A.fct))}${A.unit} </span>&nbsp;`; }
+  el.innerHTML = h + `Time: ${st.hoverT.toFixed(4)}s`;
+}
+function updateMarkerUI(){
+  if (!S.markers) return;
+  if (!curCap() || st.m.t1 == null || !st._R) { $('#flag1').style.visibility = $('#flag2').style.visibility = 'hidden'; return; }
+  const R = st._R, v = st.view, sp = v.t1 - v.t0, X = t => R.x + (t - v.t0) / sp * R.w;
+  const inside = t => t >= v.t0 && t <= v.t1;
+  for (const [id, t] of [['#flag1', st.m.t1], ['#flag2', st.m.t2]]) { const f = $(id); f.style.left = X(t) + 'px'; f.style.visibility = inside(t) ? 'visible' : 'hidden'; }
+  const a = Math.min(st.m.t1, st.m.t2), b = Math.max(st.m.t1, st.m.t2);
+  $('#mlabel').textContent = `T1: ${st.m.t1.toFixed(3)}s, T2: ${st.m.t2.toFixed(3)}s, dT: ${fmtDur(b - a)}`;
+}
+
+/* ---------------- interaction ---------------- */
+const chart = $('#chart');
+function tAtX(x){ const R = st._R, v = st.view; return v.t0 + (x - R.x) / R.w * (v.t1 - v.t0); }
+chart.addEventListener('mousemove', e => {
+  const x = localX(e, chart), R = st._R; if (!R) return;
+  if (st.drag === 'sel') { st.sel.b = tAtX(x); drawChart(); return; }
+  if (st.drag === 'm1' || st.drag === 'm2' || st.drag === 'axis') return;
+  st.hoverT = (curCap() && x >= R.x && x <= R.x + R.w) ? tAtX(x) : null;
+  const near = S.markers && st.m.t1 != null && [st.m.t1, st.m.t2].some(t => Math.abs(R.x + (t - st.view.t0) / (st.view.t1 - st.view.t0) * R.w - x) < 4);
+  chart.style.cursor = near ? 'ew-resize' : axisAt(x, localY(e, chart)) != null ? 'ns-resize' : 'crosshair';
+  drawChart(); updateHover();
+});
+chart.addEventListener('mouseleave', () => { if (!st.drag) { st.hoverT = null; drawChart(); updateHover(); } });
+chart.addEventListener('mousedown', e => {
+  if (e.button !== 0) return; const x = localX(e, chart), R = st._R; if (!R || !curCap()) return;
+  const ax = axisAt(x, localY(e, chart));
+  if (ax != null) {   // vertical drag = scale (Shift: move), sideways drag = move the axis to the other side
+    const A = st._axes[ax]; if (!A) return; const y = localY(e, chart);
+    st.drag = 'axis'; st.axDrag = {c: ax, x, x0: x, y, y0: y, mode: null, pan: e.shiftKey, lo0: A.lo, hi0: A.hi,
+                                   anchor: A.lo + (R.y + R.h - y) / R.h * (A.hi - A.lo)};
+    e.preventDefault(); return;
+  }
+  if (S.markers && st.m.t1 != null) {
+    const px = t => R.x + (t - st.view.t0) / (st.view.t1 - st.view.t0) * R.w;
+    if (Math.abs(px(st.m.t1) - x) < 5) { st.drag = 'm1'; return; } if (Math.abs(px(st.m.t2) - x) < 5) { st.drag = 'm2'; return; }
+  }
+  if (logging() && st.follow && curCap().running) return; // zoom works when measuring is stopped (as in REAMP-Logger)
+  st.drag = 'sel'; st.sel = {a: tAtX(x), b: tAtX(x)};
+});
+window.addEventListener('mouseup', () => {
+  if (st.drag === 'axis' && st.axDrag) {
+    const d = st.axDrag; st.axDrag = null; st.drag = null; chart.style.cursor = 'crosshair';
+    if (d.mode === 'side') moveAxis(d.c, d.x < chart.clientWidth / 2 ? 'L' : 'R'); else drawChart();
+    return;
+  }
+  if (st.drag === 'sel' && st.sel) { const a = Math.min(st.sel.a, st.sel.b), b = Math.max(st.sel.a, st.sel.b); const R = st._R;
+    if ((b - a) / (st.view.t1 - st.view.t0) * R.w > 5) zoomTo(a, b); st.sel = null; drawChart(); }
+  if (st.drag) { st.drag = null; st.needEnv = true; }
+});
+chart.addEventListener('dblclick', e => {
+  const ax = axisAt(localX(e, chart), localY(e, chart));
+  if (ax != null) { delete st.yman[ax]; drawChart(); return; }   // double-click an axis: automatic scale again
+  resetZoom();
+});
+chart.addEventListener('wheel', e => {
+  const ax = axisAt(localX(e, chart), localY(e, chart));
+  if (ax != null && st._axes[ax]) {   // wheel over an axis zooms that trace around the pointer (up = in)
+    e.preventDefault(); const A = st._axes[ax], R = st._R, a = A.lo + (R.y + R.h - localY(e, chart)) / R.h * (A.hi - A.lo), k = e.deltaY > 0 ? 1.2 : 1 / 1.2;
+    st.yman[ax] = {lo: a - (a - A.lo) * k, hi: a + (A.hi - a) * k}; drawChart(); return;
+  }
+  const cap = curCap(); if (!cap || (cap.running && st.follow)) return; e.preventDefault();
+  const t = tAtX(localX(e, chart)), k = e.deltaY > 0 ? 1.25 : 0.8;
+  zoomTo(t - (t - st.view.t0) * k, t + (st.view.t1 - t) * k);
+}, {passive:false});
+function zoomTo(a, b){
+  const cap = curCap(); if (!cap) return; const T = Math.max(cap.dur, cap.dt * 10);
+  const minSp = cap.dt * 20; if (b - a < minSp) { const m = (a + b) / 2; a = m - minSp / 2; b = m + minSp / 2; }
+  if (b - a > T) { a = 0; b = T; } if (a < 0) { b -= a; a = 0; } if (b > T) { a -= b - T; b = T; } a = Math.max(0, a);
+  st.view = {t0:a, t1:b}; st.follow = false; st.needEnv = true; draw();
+}
+function resetZoom(){ st.yman = {}; const cap = curCap(); if (!cap) return; if (cap.running) { st.follow = true; } else { st.view = {t0:0, t1:Math.max(cap.dur, cap.dt * 10)}; } st.needEnv = true; draw(); }
+runBtn('#bResetZoom', resetZoom);
+[['#flag1','m1'],['#flag2','m2']].forEach(([id, k]) => $(id).addEventListener('mousedown', e => { st.drag = k; e.preventDefault(); }));
+window.addEventListener('mousemove', e => { if ((st.drag === 'm1' || st.drag === 'm2') && st._R) { st.m[st.drag === 'm1' ? 't1' : 't2'] = tAtX(localX(e, chart)); draw(); } });
+window.addEventListener('mousemove', e => {
+  const d = st.axDrag; if (st.drag !== 'axis' || !d || !st._R) return;
+  d.x = localX(e, chart); d.y = localY(e, chart);
+  const dx = d.x - d.x0, dy = d.y - d.y0;
+  if (!d.mode && Math.max(Math.abs(dx), Math.abs(dy)) > 5) {
+    d.mode = Math.abs(dy) >= Math.abs(dx) ? (d.pan ? 'pan' : 'scale') : 'side';
+    chart.style.cursor = d.mode === 'side' ? 'grabbing' : 'ns-resize';
+  }
+  if (d.mode === 'scale') { const k = Math.exp(dy / 120); st.yman[d.c] = {lo: d.anchor - (d.anchor - d.lo0) * k, hi: d.anchor + (d.hi0 - d.anchor) * k}; }
+  else if (d.mode === 'pan') { const sh = dy / st._R.h * (d.hi0 - d.lo0); st.yman[d.c] = {lo: d.lo0 + sh, hi: d.hi0 + sh}; }
+  if (d.mode) drawChart();
+});
+const nav = $('#nav'); let navDrag = false;
+function navTo(e){ const cap = curCap(), N = st._nav; if (!cap || !N) return; const t = (localX(e, nav) - N.L) / (N.Rr - N.L) * N.T; const sp = st.view.t1 - st.view.t0;
+  if (cap.running) { st.follow = false; } zoomTo(t - sp / 2, t + sp / 2); }
+nav.addEventListener('mousedown', e => { navDrag = true; navTo(e); });
+window.addEventListener('mousemove', e => { if (navDrag) navTo(e); });
+window.addEventListener('mouseup', () => { navDrag = false; });
+$('#bEvSet').onclick = e => { const p = $('#evpop'); p.style.display = p.style.display === 'block' ? 'none' : 'block'; e.stopPropagation(); };
+$('#evpop').addEventListener('click', e => e.stopPropagation());
+document.addEventListener('click', () => { $('#evpop').style.display = 'none'; });
+$('#inThr').onchange = e => { S.thr = e.target.value === '' ? null : +e.target.value; saveS(); drawNav(); };
+window.addEventListener('resize', () => { st.needEnv = true; draw(); });
+
+/* ---------------- calculator ---------------- */
+function lifeText(mAh, mA){
+  if (!(mA > 0) || !(mAh > 0)) return '--';
+  const hours = mAh / mA, days = hours / 24;
+  if (days < 1) return `${hours.toFixed(1)} hours`;
+  const y = Math.floor(days / 365.25), mo = Math.floor((days - y * 365.25) / 30.44), d = Math.floor(days - y * 365.25 - mo * 30.44);
+  return [y ? `${y} year${y > 1 ? 's' : ''}` : '', mo ? `${mo} month${mo > 1 ? 's' : ''}` : '', `${d} day${d !== 1 ? 's' : ''}`].filter(Boolean).join(', ');
+}
+const uAtxt = uA => uA == null ? '--' : (uA < 1000 ? uA.toFixed(2) + 'µA' : (uA / 1000).toFixed(3) + 'mA');
+function updateCalc(){
+  const cap = curCap(), has0 = cap && cap.channels.includes(0);
+  const get = s => has0 && s && s['0'] ? s['0'][2] : null;
+  const v = st.view;
+  $('#cbMk').textContent = S.markers && st.m.t1 != null ? `${Math.min(st.m.t1,st.m.t2).toFixed(3)} : ${Math.max(st.m.t1,st.m.t2).toFixed(3)}` : '-- : --';
+  $('#cvMk').textContent = S.markers ? uAtxt(get(st.win)) : '--- mA';
+  $('#cbVis').textContent = `${v.t0.toFixed(3)} : ${v.t1.toFixed(3)} [${fmtDur(v.t1 - v.t0)}]`; $('#cvVis').textContent = uAtxt(get(st.vis));
+  $('#cbAll').textContent = cap ? `0.000 : ${cap.dur.toFixed(3)} [${fmtDur(cap.dur)}]` : '--'; $('#cvAll').textContent = uAtxt(get(st.full));
+  $('#cvCyc').textContent = uAtxt(get(st.cyc));
+  const mode = radio('avg'); let uA = null;
+  if (mode === 'mk') uA = S.markers ? get(st.win) : null; else if (mode === 'vis') uA = get(st.vis); else if (mode === 'all') uA = get(st.full);
+  else if (mode === 'cyc') uA = get(st.cyc); else uA = (+$('#inUsr').value || 0) * 1000;
+  S.cap = +$('#inCap').value || S.cap; saveS();
+  $('#blife').textContent = lifeText(S.cap, uA == null ? null : uA / 1000);
+  $('#blcalc').textContent = uA > 0 && S.cap > 0 ? `${S.cap} mAh ÷ ${uAtxt(uA)} = ${Math.round(S.cap / (uA / 1000)).toLocaleString()} hours` : '';
+  $('#calcNote').textContent = mode === 'cyc' ? 'Working cycle: average over this many seconds starting at T1 (or at the start of the capture without markers).' :
+    (!has0 && mode !== 'usr' ? 'This capture has no current channel (#0).' : 'Estimate only: ignores self-discharge and the end-of-life voltage of the battery.');
+}
+$$('#dlgCalc input').forEach(i => i.addEventListener('input', updateCalc));
+
+/* ---------------- open & settings ---------------- */
+async function openDialog(){
+  const r = await (await fetch('/api/logs')).json(); const box = $('#loglist');
+  box.innerHTML = '<div class="hdr"><span>File</span><span>Size</span><span>Modified</span></div>' +
+    (r.logs.length ? '' : '<div><span>No logs yet</span></div>');
+  for (const l of r.logs) { const d = document.createElement('div'); d.innerHTML = `<span>${l.file}</span><span>${(l.size / 1048576).toFixed(1)} MB</span><span>${l.date}</span>`;
+    d.ondblclick = async () => { $('#dlgOpen').close(); msg('Opening ' + l.file + '...'); const x = await api({action:'open', file:l.file}); if (!x.ok) msg('Open failed: ' + x.error); else { msg('Opened ' + l.file); setTimeout(() => selectCap(x.cap), 300); } };
+    box.appendChild(d); }
+  $('#dlgOpen').showModal();
+}
+function fillSettings(){
+  setRadio('theme', S.theme); $('#col0').value = S.colors[0]; $('#col1').value = S.colors[1]; $('#col2').value = S.colors[2]; $('#colBg').value = S.bg;
+  $('#selScale').value = S.scale; fillSides();
+  const d = st.dev || {};
+  $('#spAbout').innerHTML = `<b>REAMP live app</b> (reamp_app.py + reamp_ui.html)<br>Device: ${d.info || 'not connected'}<br>Serial number: ${d.serial || '--'}<br>` +
+    `Timebase: ${d.calibrated ? 'calibrated (reamp_timebase.json)' : 'nominal'}<br>Logs are saved automatically in REAMP-Control\\logs as CSV.<br>` +
+    `<span class="hint">Protocol reverse-engineered from REAMP-Logger 2.0.7. Not affiliated with RigExpert.</span>`;
+}
+$$('.stab').forEach(b => b.onclick = () => { $$('.stab').forEach(x => x.classList.toggle('sel', x === b)); $('#spApp').style.display = b.dataset.s === 'app' ? '' : 'none'; $('#spAbout').style.display = b.dataset.s === 'about' ? '' : 'none'; });
+$$('input[name=theme]').forEach(r => r.onchange = () => { setTheme(radio('theme')); $('#colBg').value = S.bg; applyLayout(); saveS(); });
+['col0','col1','col2'].forEach((id, i) => $('#' + id).oninput = e => { S.colors[i] = e.target.value; saveS(); applyLayout(); renderTabs(); });
+$('#colBg').oninput = e => { S.bg = e.target.value; saveS(); draw(); };
+$('#bDefColors').onclick = () => { S.colors = {...DEF.colors}; S.bg = S.theme === 'dark' ? '#1e1e1e' : '#ffffff'; fillSettings(); saveS(); applyLayout(); };
+function fillSides(){ [0, 1, 2].forEach(c => setRadio('side' + c, S.side[c] === 'L' ? 'L' : 'R')); }
+[0, 1, 2].forEach(c => $$(`input[name=side${c}]`).forEach(rb => rb.onchange = () => moveAxis(c, rb.value)));
+
+/* ---------------- hover help ---------------- */
+const HELP = {
+  save: ['Save', 'Save data as CSV downloads the selected capture’s file. (Every capture is already saved automatically in REAMP-Control\\logs while it runs.) Save chart as PNG saves a picture of the chart exactly as it is shown, with the current zoom and smoothing.'],
+  open: ['Open', 'Opens a saved log from REAMP-Control\\logs in a new tab so you can zoom, measure and calculate on it. Double-click a file in the list. Reads files written by this app and by reamp_cli.py.'],
+  view: ['View', 'Shows or hides parts of the window: the control panel, the big readouts, the navigation bar and the report. Also switches between the light and dark theme.'],
+  settings: ['Settings', 'Colour theme, trace and background colours, interface size, and device information (firmware, serial number, timebase calibration).'],
+  show: ['Show … sec', 'Width of the time window while measuring: the chart scrolls to keep the newest data in view and shows this many seconds. After you stop, zoom freely; double-click the chart or press Fit to see the whole capture.'],
+  report: ['Show / Hide Report', 'Shows or hides the statistics under the chart: minimum, maximum and average of each channel for the whole capture and, with markers on, between T1 and T2. Statistics always use the raw samples, never the smoothed line.'],
+  markers: ['Show / Hide Markers', 'Two time markers, T1 and T2. Drag the green flags, or the lines on the chart, to mark an interval. The yellow box and the report show its length and the min / max / average between the markers, and the Calculator can use that interval.'],
+  calc: ['Battery Calculator', 'Estimates how long a battery would run the device you measured: capacity (mAh) ÷ average current. Use it to predict battery life, compare firmware or settings, find which part of a cycle costs the most, or size a battery. The average can come from the markers, the visible part of the chart, the whole capture, one repeating working cycle, or a current you type in. The dialog explains each choice.'],
+  size: ['Interface size', 'Makes all text and controls larger or smaller, 80–200 %. Click the percentage to go back to 100 %. The setting is remembered. Chrome’s own zoom (Ctrl + / Ctrl −) works as well.'],
+  help: ['Help', 'Keyboard shortcuts and a short overview. Hover over any control, or click a small ? sign, for an explanation of that control.'],
+  meas: ['Measuring time, sec', 'Stops the measurement automatically after this many seconds of data. ∞ = keep measuring until you press Stop. With TRIG, the waiting time before the trigger does not count.'],
+  pmode: ['Power output config', 'Controls the REAMP’s Vout pin, which powers the device under test (DUT). Permanent: the output switches on now and stays on. Delayed: the output stays off and switches on just after a measurement starts (about 100 samples later, at most 100 ms), so the DUT’s power-up current is recorded; it switches off again when the measurement ends. Off: no power to the DUT. The choice takes effect when you press Set.'],
+  pm8: ['Permanent', 'The output is switched on as soon as you press Set and stays on, measuring or not.'],
+  pm12: ['Delayed', 'The output is off while stopped. When a measurement starts, the REAMP switches it on after about 100 samples (at most 100 ms), so the chart shows the DUT’s start-up current from the very first microamp. Press Set to choose this mode.'],
+  pm4: ['Off', 'Disconnects the output: the DUT gets no power. Press Set to apply.'],
+  set: ['Set', 'Sends the selected output mode (Permanent / Delayed / Off) to the REAMP. Also works while measuring, for example to switch the DUT off and on in the middle of a capture.'],
+  reset: ['Reset errors', 'Appears when the REAMP reports an error (the FLAG light), such as an overload. The output current is limited to 0.5 A when the REAMP runs from USB and 1.5 A on its battery. Resetting clears the error so the output can be used again.'],
+  volt: ['Output voltage', 'The voltage on the Vout pin that powers the DUT: 1.800–5.200 V. Change one digit at a time with its ▲ ▼ arrows, the mouse wheel over that digit, or the keyboard (click a digit, then ↑ ↓; ← → moves to the next digit; type 0–9; Enter applies; Esc goes back to the REAMP’s value). The slider makes quick, coarse changes in 25 mV steps. Nothing above the Limit can be selected. Measured on this REAMP: the real output moves in 25 mV steps, rounded down (3.100–3.124 V setpoints all give about 3.098 V), so the last two digits only matter when they cross a 25 mV boundary.'],
+  digits: ['Voltage digits', 'Volts . hundreds . tens . units of millivolts. Mouse wheel over a digit, or its ▲ ▼ arrows (hold to repeat), change that digit and carry into the next one. Click a digit to select it, then use ↑ ↓ ← →, PgUp / PgDn (±100 mV), type 0–9, Enter to apply, Esc to undo.'],
+  vq: ['25 mV output steps', 'Measured on this REAMP (11/25/2026, watch connected): the output voltage moves in 25 mV steps and rounds the setpoint down, about 2 mV below the step. 3100, 3110 and 3121 mV all gave 3.098 V at Vin1; 3125–3149 mV gave 3.123 V; 3150 mV gave 3.147 V. RigExpert’s manual says 50 mV steps.'],
+  vstate: ['Applied?', 'Green tick: the REAMP is set to the voltage shown. Orange: you changed the voltage but it has not been sent yet; press Set voltage or Enter.'],
+  slider: ['Voltage slider', 'Drag for quick, coarse changes in 25 mV steps (the size of the REAMP’s real output steps), from 1.800 V up to the Limit. With Apply instantly on, the REAMP follows the slider while you drag; fine-tune with the digits.'],
+  instant: ['Apply instantly', 'On: every change from the arrows, mouse wheel or slider goes to the REAMP straight away (up to about 10 changes a second), so you can watch the DUT react. Digits you type are sent when you press Enter. Off: changes wait until you press Set voltage. Works while measuring too.'],
+  setv: ['Set voltage', 'Sends the voltage shown above to the REAMP. Only needed when Apply instantly is off. Enter does the same when the digits are selected.'],
+  vmax: ['Limit', 'Safety ceiling, 1800–5200 mV: the digits and slider cannot go above it, so a slip of the mouse or a typo cannot put too much voltage on a low-voltage DUT. If the REAMP is already set higher, you can still lower it. Default 3300 mV.'],
+  vin: ['Switch Vin', 'Where the REAMP takes the power for its output from. Vusb → Vin: the USB port, for DUTs drawing less than 500 mA (the USB port’s 500 mA is shared with charging the REAMP’s internal battery). Vbat → Vin: the built-in Li-ion battery, for DUTs that need more than 500 mA (output limit 1.5 A). If the battery falls below 3 V, the REAMP switches to USB to recharge it. Takes effect when you press Apply.'],
+  sync: ['Apply sync related to', 'Chooses what switches the SYNC output pin, used to start an external circuit in step with the measurement. SYNC is an open-drain output and is active when LOW. TRIG: SYNC becomes active Sync delay ms after the TRIG input becomes active. Logging: SYNC becomes active Sync delay ms after the measurement starts. In both cases it is released when the measurement ends. Takes effect when you press Apply, while measuring is stopped.'],
+  syncdelay: ['Sync delay (ms)', 'Time, 0–65535 ms, between the TRIG signal or the start of the measurement (see Apply sync related to) and SYNC becoming active. 0 = no delay.'],
+  apply: ['Apply', 'Sends Switch Vin, the output voltage and the SYNC settings to the REAMP together. Available only while measuring is stopped.'],
+  rate: ['Sample rate', 'How often every selected channel is measured, 10 Hz–10 kHz. The REAMP counts in 100 µs steps, so the rate is 10 kHz ÷ N. 10 kHz works with one channel only. This REAMP’s clock runs about 0.5 % fast, and at the 10 kHz setting it really delivers about 9.0 kHz; the app uses the measured true rates (reamp_timebase.json) for its timestamps. Faster rates catch shorter events but make larger files: 1 kHz on one channel is about 70 MB of CSV per hour.'],
+  custom: ['Custom (100 µs units)', 'Tick to enter any sampling period instead of choosing from the list: N × 100 µs, N = 1–1000 (10 kHz down to 10 Hz). Example: 4 = 400 µs = 2.5 kHz.'],
+  period: ['Sampling period', 'Period in 100 µs units when Custom is ticked: 1 = 10 kHz, 10 = 1 kHz, 1000 = 10 Hz. The resulting rate is shown next to it.'],
+  chans: ['Channels', 'Choose what is logged. #0 is the current flowing from Vout into the DUT; #1 and #2 are the voltages on the Vin1 and Vin2 input pins. More channels share the same sample rate; 10 kHz allows only one.'],
+  ch0: ['#0: Current', 'The current flowing out of Vout into the DUT. Ranges switch automatically up to 2 A (2 mA / 20 mA / 200 mA / 2 A); on the lowest range one step is 0.122 µA. RigExpert rates the accuracy from 10 µA to 1 A, so readings of a few microamps are below the rated range.'],
+  ch1: ['#1: Vin1', 'DC voltage on the Vin1 input pin, measured against GND: 0–5 V, 1 mV steps (rated 20 mV–5 V). Each sample is the voltage at that moment, not an RMS value. Connect it to any point of the DUT, for example right at the DUT’s supply pin to see the voltage it really gets.'],
+  ch2: ['#2: Vin2', 'Voltage on the Vin2 input pin; same as #1.'],
+  mult: ['Multiplier', 'Scales the displayed #1 / #2 voltage, for example 2 if you measure through a 1:2 resistor divider. Display only: the saved CSV keeps the REAMP’s own reading.'],
+  smooth: ['Trace smoothing', 'Smooths a channel’s line on the chart with a moving average, in 10 levels. Level L averages 2^L + 1 neighbouring samples: 1 = 3 samples, 5 = 33, 10 = 1025. The time each level spans depends on the sample rate and is shown in the list. Display only: the statistics, the Calculator and the saved CSV always use the raw samples.'],
+  level: ['TRIG level', 'Measures only while the TRIG input is active: logging starts when TRIG goes high and stops when it goes low. TRIG counts as high at 2.5–10 V and low below 1 V.'],
+  delay: ['TRIG delay (ms)', 'Used by the TRIG button: after the TRIG input goes high, wait this many milliseconds (0–65535) before measuring starts. 0 = start at once.'],
+  trig: ['TRIG', 'Arms the REAMP: measuring starts when the TRIG input goes high (2.5–10 V), after the TRIG delay if one is set, and runs until you press Stop or the Measuring time ends. While waiting, the button pulses orange.'],
+  start: ['Start (Space)', 'Starts measuring now with the selected sample rate and channels. Each measurement opens in a new tab and is saved automatically to REAMP-Control\\logs. While measuring, this button turns solid green.'],
+  stop: ['Stop (Space)', 'Ends the measurement. The capture stays in its tab and its CSV file is complete.'],
+  toggle: ['Start / Stop (Space)', 'Quick start and stop: starts a measurement when stopped (green ▶), stops it when running (red ■).'],
+  restart: ['Restart (R)', 'Stops the running measurement (it stays in its tab and file) and immediately starts a new one with the current settings, in the same start mode (Start, TRIG or TRIG level). When stopped, it simply starts a new one.'],
+  fit: ['Fit (F)', 'Resets the zoom to show the whole capture and returns every Y axis to automatic scaling, the same as double-clicking the chart. While measuring it returns to following the newest data.'],
+  events: ['Event detector', 'Sets the threshold for the red event line in the navigation bar: it steps up wherever channel #0 (or the first channel) goes above the threshold, so peaks in a long capture are easy to find. Click there in the navigation bar to jump to them. Empty = 80 % of the highest peak.'],
+  navbar: ['Navigation bar', 'Shows the whole capture. The blue box marks the part shown in the chart: click or drag in the bar to move it. The red line marks events above the threshold set with the ⚙ button.'],
+  chart: ['Chart', 'Drag across the chart to zoom into that span; turn the mouse wheel to zoom around the pointer; double-click (or Fit) to see everything. While measuring, the chart follows the newest data and zoom is off. The pale band is the min–max range of the samples in each pixel column and the solid line is their average. Each channel has its own Y axis: drag up / down on it (or use the wheel over it) to rescale that trace, double-click it for automatic scaling, and drag it sideways or click the arrow under it to move it left or right. Hover to read values at the bottom right.'],
+  tabs: ['Capture tabs', 'Each measurement, and each opened file, gets its own tab. Click a tab to view it; × closes it (the CSV file stays on disk). The running capture is marked *.'],
+  flags: ['Markers T1 / T2', 'Drag to move. The interval between them is used by the yellow box, the second report table and the Calculator’s By markers option.'],
+  reportTables: ['Report', 'Min, max and average of each channel. Average is the plain arithmetic mean of the samples (for voltages, the DC level, not RMS). Full range covers the whole capture; the second table covers T1–T2 when markers are shown. p-p = max − min. AC rms = the standard deviation: the RMS of the variation around the average, i.e. ripple plus noise with the DC removed. Both only see changes slower than half the sample rate, so switching-regulator ripple (hundreds of kHz) is invisible; 100/120 Hz line ripple and slow bursts show up at 1 kHz or faster. Always raw samples, not smoothed.'],
+  hover: ['Pointer readout', 'The value of each channel at the mouse pointer and its time from the start of the capture. Shows the smoothed value if smoothing is on.'],
+  mRun: ['Status', 'READY: connected and stopped (Space starts). MEASURING: logging, with elapsed time and true sample rate. ARMED: waiting for the TRIG signal. OFFLINE: the REAMP is not answering; check the USB cable.'],
+  m0: ['Current', 'DUT current. While measuring: average of the last 0.3 s of samples. When stopped: the REAMP’s own reading, averaged over about 1 s.'],
+  m1: ['Vin1', 'DC voltage on the Vin1 pin (times the #1 Multiplier), shown as an average of samples, not RMS. While measuring (channel #1 ticked) it is the average of the last 0.3 s, and the small line also gives the AC rms ripple of those samples; when stopped it is the REAMP’s reading averaged over about 1 s.'],
+  m2: ['Vin2', 'Voltage on the Vin2 pin (times the #2 Multiplier), like Vin1.'],
+  mOut: ['Output setpoint', 'The voltage the REAMP is set to put on Vout (a setting, not a measurement), and the output state: ON (green), DELAYED (amber: on only while measuring) or OFF (red), plus where the power comes from (USB or battery). ERROR (red) means the REAMP reports a fault; use Reset errors in the control panel. Compare with Vin1 to see the voltage the DUT really gets.'],
+  mSup: ['REAMP supply', 'The voltage the REAMP itself runs on: about 5 V from USB, or 3–4.2 V from its internal battery.'],
+  mSig: ['Signals', 'Green = active or OK, grey = inactive, red = fault. TRIG: the TRIG input is high. SYNC: the SYNC output is active. OK / ERROR: the REAMP’s error flags. They are read with the REAMP’s status, which pauses while measuring.'],
+  sigTrig: ['TRIG', 'Green while the TRIG input is high (2.5–10 V); grey when it is low (below 1 V). Low is normal when nothing is connected to TRIG.'],
+  sigSync: ['SYNC', 'Green while the SYNC output is active (pulled LOW), which happens only during a measurement with SYNC set up; grey otherwise.'],
+  sigErr: ['OK / ERROR', 'Green OK: no error flags. Red ERROR: the REAMP reports a fault such as an overload (output current limit 0.5 A on USB, 1.5 A on battery); the output is shown as ERROR and a Reset errors button appears in the control panel.'],
+  dtabs: ['Control / Status', 'Control: power and measurement settings. Status: indicator lights and the REAMP’s readings.'],
+  ledVbat: ['Vbat', 'Lit when the output is powered from the REAMP’s internal battery.'],
+  ledVusb: ['Vusb', 'Lit when the output is powered from USB.'],
+  ledSync: ['SYNC', 'Lit when the SYNC output is active (pulled LOW).'],
+  ledTrig: ['TRIG', 'Lit when the TRIG input is high (active, 2.5–10 V).'],
+  ledOut: ['OUT-EN', 'Lit when the output to the DUT is switched on.'],
+  ledFlag: ['FLAG', 'Lit when the REAMP reports an error, such as an overload. Use Reset errors in the Control tab.'],
+  readouts: ['Readings', 'Current, Vin1, Vin2 and the REAMP’s own supply voltage. While measuring: averages of the last 0.3 s; when stopped: the REAMP’s status readings.'],
+  capacity: ['Battery capacity', 'Rated capacity, in mAh, of the battery that will power the device, from its datasheet. Cells in series keep the same mAh (their voltages add); cells in parallel add their mAh. A 395 (SR927) silver-oxide cell is about 55 mAh, so the watch’s two cells in series give about 55 mAh.'],
+  avg: ['Averaging current', 'Which average current to divide the capacity by. Each row shows its time span and the average it gives; the selected row is used. Pick a span that represents normal use and covers whole cycles of the device’s repeating behaviour.'],
+  avgMk: ['By markers', 'Average current between markers T1 and T2 (turn markers on first).'],
+  avgVis: ['In visible area', 'Average current over the part of the capture shown in the chart right now.'],
+  avgAll: ['The whole measurement period', 'Average current over the entire capture.'],
+  avgCyc: ['By working cycle, sec', 'Average over one full cycle of a repeating pattern: this many seconds, starting at T1 (or at the start of the capture without markers). Example: 60 for something that repeats every minute.'],
+  avgUsr: ['User defined, mA', 'Type an average current yourself, in mA, to see the battery life it would give.'],
+  life: ['Battery life', 'Capacity ÷ average current, in years, months and days; the line below shows the arithmetic. It ignores self-discharge, temperature and the battery’s voltage dropping below what the device needs, so real life is usually shorter.'],
+  axis: ['Y axes', 'Scale: drag up on an axis to stretch that trace (zoom in) or down to shrink it (zoom out), around the point you grab; the mouse wheel over an axis does the same. Shift + drag up / down moves the trace. Double-click the axis, or press Fit, to return to automatic scaling; “(manual)” in the axis title shows it is fixed. Side: drag the axis sideways and release it on the left or right half of the chart, or click the arrow button under it (also in Settings); all three can share one side.'],
+  theme: ['Colour theme', 'Light or dark window colours. The chart background follows unless you set your own colour.'],
+  colors: ['Colours', 'Colour of each channel’s trace and of the chart background. Defaults restores the original colours.'],
+};
+$$('[data-h]').forEach(el => { if (HELP[el.dataset.h]) el.dataset.help = el.dataset.h; });
+const tip = $('#helptip'); let tipTimer = null, tipEl = null;
+function hideTip(){ clearTimeout(tipTimer); tipTimer = null; tip.style.display = 'none'; }
+function showTip(el){
+  const h = HELP[el.dataset.help]; if (!h || !document.contains(el)) return;
+  const host = el.closest('dialog[open]') || document.body; if (tip.parentElement !== host) host.appendChild(tip);
+  tip.innerHTML = `<b>${h[0]}</b>${h[1]}`; tip.style.display = 'block';
+  const z = zf(), r = el.getBoundingClientRect(), tw = tip.offsetWidth * z, th = tip.offsetHeight * z;
+  let x = r.left, y = r.bottom + 6;
+  if (x + tw > innerWidth - 8) x = Math.max(8, innerWidth - 8 - tw);
+  if (y + th > innerHeight - 8) y = Math.max(8, r.top - 6 - th);
+  tip.style.left = (x / z) + 'px'; tip.style.top = (y / z) + 'px';
+}
+document.addEventListener('mouseover', e => {
+  const el = e.target.closest ? e.target.closest('[data-help]') : null;
+  if (el === tipEl) return;
+  tipEl = el; hideTip();
+  if (el && !st.drag) tipTimer = setTimeout(() => showTip(el), el.classList.contains('qm') ? 120 : 550);
+});
+document.addEventListener('mousedown', e => { if (!(e.target.closest && e.target.closest('.qm'))) { hideTip(); tipEl = null; } }, true);
+document.addEventListener('keydown', () => hideTip(), true);
+document.addEventListener('wheel', () => hideTip(), {capture:true, passive:true});
+$$('.qm').forEach(q => q.addEventListener('click', e => { e.stopPropagation(); if (tip.style.display === 'block') hideTip(); else showTip(q); }));
+
+/* ---------------- start ---------------- */
+initControls(); applyLayout(); updateRunUI(); poll();
+</script>
+</body>
+</html>

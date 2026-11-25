@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+
+# captures and plots stay local; only the sample ships
+logs/*
+!logs/sample_*.csv
+
+# per-unit clock calibration (made by `py reamp_cli.py calibrate`)
+reamp_timebase.json
+
+# local backups, patch scripts and watch CSVs
+*.v[0-9]*.py
+*.v[0-9]*.html
+patch_*.py
+run*.csv
