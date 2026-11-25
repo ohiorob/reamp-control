@@ -1,5 +1,5 @@
 # REAMP-Control
-
+![Screenshot of new REAMP-Control app.](https://github.com/ohiorob/reamp-control/blob/f6f785e622e1a9e0bf60d16db4631c7aa7c5dee3/reamplogger.png)
 Unofficial Python control, logging and a live browser app for the RigExpert REAMP power-consumption logger (USB HID "uCurrentMeter", VID 0483 / PID A1DE, firmware "RigExpert Current logger v1.09"). Not affiliated with or endorsed by RigExpert.
 The protocol was reverse-engineered from REAMP-Logger 2.0.7 (full packet map at the top of `reamp.py`).
 
